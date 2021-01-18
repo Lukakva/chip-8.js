@@ -19,11 +19,16 @@ export default class Instruction {
 		Clears the screen (black)
 	*/
 	clear() {
-		const { ctx, screen } = chip
+		const { screen } = this.chip
 
-		ctx.fillStyle = 'black'
-		ctx.rect(0, 0, screen[0].length, screen.length)
-		ctx.fill()
+		for (let i = 0; i < screen.length; i++) {
+			for (let j = 0; j < screen[0].length; j++) {
+				screen[i][j] = 0
+			}
+		}
+
+		this.chip.refreshDisplay()
+		this.chip.pc += 2
 	}
 
 	/*
@@ -52,7 +57,12 @@ export default class Instruction {
 		Jumps to address NNN
 	*/
 	jump() {
-		chip.pc = this.code & 0x0FFF
+		const NNN = this.code & 0x0FFF
+		if (this.chip.pc === NNN) {
+			throw new Error('Something went wrong. The program is jumping to the current Program Counter. Infinite loop is inevitable?')
+		}
+
+		this.chip.pc = NNN
 	}
 
 	/*
@@ -153,6 +163,9 @@ export default class Instruction {
 		const NN = code & 0x00FF
 
 		chip.registers[X] += NN
+		// Limit to 255 (Mimic a 8bit behavior)
+		chip.registers[X] &= 0xFF
+
 		chip.pc += 2
 	}
 
@@ -371,45 +384,131 @@ export default class Instruction {
 		chip.pc += 2
 	}
 
-	execute() {
+	/*
+		Opcode: DXYN
+		Draws a sprite at coordinate (VX, VY) that has a width of 8 pixels
+		and a height of N+1 pixels.
+	*/
+	draw() {
+		/*
+			Each row of 8 pixels is read as bit-coded
+			starting from memory location I
+		*/
+		const { code, chip, chip: {registers, screen} } = this
+
+		const X = (code & 0x0F00) >> 8
+		const Y = (code & 0x00F0) >> 4
+		const N = (code & 0x000F)
+
+		const coordX = registers[X]
+		const coordY = registers[Y]
+
+		// Indicate if any pixel was flipped from set to unset
+		registers[0xF] = 0
+
+		for (let y = 0; y < N; y++) {
+			// A row of 8 pixels (where every bit is a pixel color)
+			const row = chip.memory[chip.registerI + y]
+
+			// Loop over each pixel value (bit by bit)
+			for (let x = 0; x < 8; x++) {
+				const mask = 0x80 >> x
+				// If this pixel should be flipped
+				if ((row & mask) > 0) {
+					// This pixel was 1? It's gonna be 0 now. Set the VF register
+					if (screen[coordY + y][coordX + x] === 1) {
+						registers[0xF] = 1
+					}
+
+					screen[coordY + y][coordX + x] ^= 1
+				}
+			}
+		}
+
+		chip.refreshDisplay()
+		chip.pc += 2
+	}
+
+	/*
+		Opcode: FX07
+		Sets VX to the value of the delay timer.
+	*/
+	getDelayTimer() {
+		const { code, chip } = this
+
+		const X = (code & 0x0F00) >> 8
+
+		chip.registers[X] = this.delayTimer
+		chip.pc += 2
+	}
+
+	/*
+		Opcode: FX15
+		Sets the delay timer to VX.
+	*/
+	setDelayTimer() {
+		const { code, chip } = this
+
+		const X = (code & 0x0F00) >> 8
+
+		this.delayTimer = chip.registers[X]
+		chip.pc += 2
+	}
+
+	/*
+		Opcode: FX1E
+		Adds VX to I. VF is not affected.
+	*/
+	addMem() {
+		const { code, chip } = this
+
+		const X = (code & 0x0F00) >> 8
+		chip.registerI += chip.registers[X]
+		// Limit to 16 bits
+		chip.registerI &= 0xFFFF
+
+		chip.pc += 2
+	}
+
+	getInstructionName() {
 		const code = this.code
 		// The only 2 opcodes that can be matched exactly
 		if (code === 0x00E0) {
-			return this.clear()
+			return 'clear'
 		}
 
 		if (code === 0x00EE) {
-			return this.returnFromSubroutine()
+			return 'returnFromSubroutine'
 		}
 
 		// Otherwise, opcodes depend on the first hex value (first 4 bits)
 		switch (code & 0xF000) {
 			case 0x1000: {
-				return this.jump()
+				return 'jump'
 			}
 
 			case 0x2000: {
-				return this.callSubroutine()
+				return 'callSubroutine'
 			}
 
 			case 0x3000: {
-				return this.skipIfRegisterEquals()
+				return 'skipIfRegisterEquals'
 			}
 
 			case 0x4000: {
-				return this.skipIfRegisterNotEquals()
+				return 'skipIfRegisterNotEquals'
 			}
 
 			case 0x5000: {
-				return this.skipIfRegistersEqual()
+				return 'skipIfRegistersEqual'
 			}
 
 			case 0x6000: {
-				return this.setRegisterValue()
+				return 'setRegisterValue'
 			}
 
 			case 0x7000: {
-				return this.addToRegisterValue()
+				return 'addToRegisterValue'
 			}
 
 			/*
@@ -420,60 +519,88 @@ export default class Instruction {
 				// The last 4 bits
 				switch (code & 0x000F) {
 					case 0x0: {
-						return this.assign()
+						return 'assign'
 					}
 
 					case 0x1: {
-						return this.bitwiseOr()
+						return 'bitwiseOr'
 					}
 
 					case 0x2: {
-						return this.bitwiseAnd()
+						return 'bitwiseAnd'
 					}
 
 					case 0x3: {
-						return this.bitwiseXor()
+						return 'bitwiseXor'
 					}
 
 					case 0x4: {
-						return this.add()
+						return 'add'
 					}
 
 					case 0x5: {
-						return this.subtract()
+						return 'subtract'
 					}
 
 					case 0x6: {
-						return this.shiftRight()
+						return 'shiftRight'
 					}
 
 					case 0x7: {
-						return this.subtractRegisters()
+						return 'subtractRegisters'
 					}
 
 					case 0xE: {
-						return this.shiftLeft()
+						return 'shiftLeft'
 					}
 				}
 			}
 
 			case 0x9000: {
-				return this.skipIfRegistersNotEqual()
+				return 'skipIfRegistersNotEqual'
 			}
 
 			case 0xA000: {
-				return this.setMemoryRegister()
+				return 'setMemoryRegister'
 			}
 
 			case 0xB000: {
-				return this.jumpV0()
+				return 'jumpV0'
 			}
 
 			case 0xC000: {
-				return this.rand()
+				return 'rand'
+			}
+
+			case 0xD000: {
+				return 'draw'
+			}
+
+			case 0xF000: {
+				// For F opcodes, the last 2 bits are the identifiers
+				switch (code & 0x00FF) {
+					case 0x07: {
+						return 'getDelayTimer'
+					}
+
+					case 0x15: {
+						return 'getDelayTimer'
+					}
+
+					case 0x1E: {
+						return 'addMem'
+					}
+				}
 			}
 		}
 
-		throw new Error('Unknown instruction: 0x' + code.toString(16))
+		throw new Error('Unknown instruction: 0x' + hex(code))
+	}
+
+	execute() {
+		const name = this.getInstructionName()
+		console.log('Executing instruction:', name)
+
+		this[name]()
 	}
 }

@@ -16,9 +16,8 @@ class Chip8 {
 		if (!this.canvas) {
 			throw new Error('Canvas not found:', canvasSelector)
 		}
-		this.ctx = this.canvas.getContext('2d')
 
-		this.init()
+		this.ctx = this.canvas.getContext('2d')
 	}
 
 	init() {
@@ -26,13 +25,13 @@ class Chip8 {
 			Initialize the RAM, registers, stack
 			(in order of the Wikipedia article)
 		*/
-		this.memory = new Uint8Array(RAM_SIZE)
+		this.memory = new Uint16Array(RAM_SIZE)
 
 		/*
 			15 general purpose 8-bit registers (V0-VE)
 			+ 1 carry flag register (VF)
 		*/
-		this.registers = new Uint8Array(N_REGISTERS)
+		this.registers = new Uint16Array(N_REGISTERS)
 
 		/* 16 bit address register (I) */
 		this.registerI = 0
@@ -56,6 +55,8 @@ class Chip8 {
 
 		this.canvas.width = SCREEN_WIDTH
 		this.canvas.height = SCREEN_HEIGHT
+		this.canvas.style.imageRendering = 'pixelated'
+		this.refreshDisplay()
 	}
 
 	/* Just a cool debugging thing */
@@ -130,10 +131,37 @@ class Chip8 {
 		instruction.execute()
 	}
 
+	refreshDisplay() {
+		const { ctx, screen } = this
+
+		ctx.fillStyle = 'black'
+		ctx.fillRect(0, 0, screen[0].length, screen.length)
+
+		ctx.fillStyle = 'white'
+
+		let filled = 0
+		for (let y = 0; y < 32; y++) {
+			for (let x = 0; x < 64; x++) {
+				// Draw a white pixel where necessary
+				if (screen[y][x] == 1) {
+					ctx.fillRect(x, y, 1, 1)
+				}
+			}
+		}
+	}
+
 	/* A CPU cycle */
 	cycle() {
 		const opcode = this.fetchOpcode()
 		this.executeOpcode(opcode)
+
+		if (this.delayTimer > 0) {
+			this.delayTimer--
+		}
+
+		window.requestAnimationFrame(() => {
+			this.cycle()
+		})
 	}
 }
 

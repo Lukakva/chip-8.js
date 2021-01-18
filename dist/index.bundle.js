@@ -41,7 +41,6 @@ var Chip8 = /*#__PURE__*/function () {
     }
 
     this.ctx = this.canvas.getContext('2d');
-    this.init();
   }
 
   _createClass(Chip8, [{
@@ -51,13 +50,13 @@ var Chip8 = /*#__PURE__*/function () {
       	Initialize the RAM, registers, stack
       	(in order of the Wikipedia article)
       */
-      this.memory = new Uint8Array(RAM_SIZE);
+      this.memory = new Uint16Array(RAM_SIZE);
       /*
       	15 general purpose 8-bit registers (V0-VE)
       	+ 1 carry flag register (VF)
       */
 
-      this.registers = new Uint8Array(N_REGISTERS);
+      this.registers = new Uint16Array(N_REGISTERS);
       /* 16 bit address register (I) */
 
       this.registerI = 0;
@@ -82,6 +81,8 @@ var Chip8 = /*#__PURE__*/function () {
 
       this.canvas.width = SCREEN_WIDTH;
       this.canvas.height = SCREEN_HEIGHT;
+      this.canvas.style.imageRendering = 'pixelated';
+      this.refreshDisplay();
     }
     /* Just a cool debugging thing */
 
@@ -169,13 +170,42 @@ var Chip8 = /*#__PURE__*/function () {
       var instruction = new _Instruction__WEBPACK_IMPORTED_MODULE_0__.default(opcode, this);
       instruction.execute();
     }
+  }, {
+    key: "refreshDisplay",
+    value: function refreshDisplay() {
+      var ctx = this.ctx,
+          screen = this.screen;
+      ctx.fillStyle = 'black';
+      ctx.fillRect(0, 0, screen[0].length, screen.length);
+      ctx.fillStyle = 'white';
+      var filled = 0;
+
+      for (var y = 0; y < 32; y++) {
+        for (var x = 0; x < 64; x++) {
+          // Draw a white pixel where necessary
+          if (screen[y][x] == 1) {
+            ctx.fillRect(x, y, 1, 1);
+          }
+        }
+      }
+    }
     /* A CPU cycle */
 
   }, {
     key: "cycle",
     value: function cycle() {
+      var _this2 = this;
+
       var opcode = this.fetchOpcode();
       this.executeOpcode(opcode);
+
+      if (this.delayTimer > 0) {
+        this.delayTimer--;
+      }
+
+      window.requestAnimationFrame(function () {
+        _this2.cycle();
+      });
     }
   }]);
 
@@ -229,12 +259,16 @@ var Instruction = /*#__PURE__*/function () {
   _createClass(Instruction, [{
     key: "clear",
     value: function clear() {
-      var _chip = chip,
-          ctx = _chip.ctx,
-          screen = _chip.screen;
-      ctx.fillStyle = 'black';
-      ctx.rect(0, 0, screen[0].length, screen.length);
-      ctx.fill();
+      var screen = this.chip.screen;
+
+      for (var i = 0; i < screen.length; i++) {
+        for (var j = 0; j < screen[0].length; j++) {
+          screen[i][j] = 0;
+        }
+      }
+
+      this.chip.refreshDisplay();
+      this.chip.pc += 2;
     }
     /*
     	Opcode: 0x00EE
@@ -265,7 +299,13 @@ var Instruction = /*#__PURE__*/function () {
   }, {
     key: "jump",
     value: function jump() {
-      chip.pc = this.code & 0x0FFF;
+      var NNN = this.code & 0x0FFF;
+
+      if (this.chip.pc === NNN) {
+        throw new Error('Something went wrong. The program is jumping to the current Program Counter. Infinite loop is inevitable?');
+      }
+
+      this.chip.pc = NNN;
     }
     /*
     	Opcode: 2NNN
@@ -375,7 +415,9 @@ var Instruction = /*#__PURE__*/function () {
           code = this.code;
       var X = (code & 0x0F00) >> 8;
       var NN = code & 0x00FF;
-      chip.registers[X] += NN;
+      chip.registers[X] += NN; // Limit to 255 (Mimic a 8bit behavior)
+
+      chip.registers[X] &= 0xFF;
       chip.pc += 2;
     }
     /*
@@ -613,54 +655,145 @@ var Instruction = /*#__PURE__*/function () {
       chip.registers[X] = random & NN;
       chip.pc += 2;
     }
+    /*
+    	Opcode: DXYN
+    	Draws a sprite at coordinate (VX, VY) that has a width of 8 pixels
+    	and a height of N+1 pixels.
+    */
+
   }, {
-    key: "execute",
-    value: function execute() {
+    key: "draw",
+    value: function draw() {
+      /*
+      	Each row of 8 pixels is read as bit-coded
+      	starting from memory location I
+      */
+      var code = this.code,
+          chip = this.chip,
+          _this$chip = this.chip,
+          registers = _this$chip.registers,
+          screen = _this$chip.screen;
+      var X = (code & 0x0F00) >> 8;
+      var Y = (code & 0x00F0) >> 4;
+      var N = code & 0x000F;
+      var coordX = registers[X];
+      var coordY = registers[Y]; // Indicate if any pixel was flipped from set to unset
+
+      registers[0xF] = 0;
+
+      for (var y = 0; y < N; y++) {
+        // A row of 8 pixels (where every bit is a pixel color)
+        var row = chip.memory[chip.registerI + y]; // Loop over each pixel value (bit by bit)
+
+        for (var x = 0; x < 8; x++) {
+          var mask = 0x80 >> x; // If this pixel should be flipped
+
+          if ((row & mask) > 0) {
+            // This pixel was 1? It's gonna be 0 now. Set the VF register
+            if (screen[coordY + y][coordX + x] === 1) {
+              registers[0xF] = 1;
+            }
+
+            screen[coordY + y][coordX + x] ^= 1;
+          }
+        }
+      }
+
+      chip.refreshDisplay();
+      chip.pc += 2;
+    }
+    /*
+    	Opcode: FX07
+    	Sets VX to the value of the delay timer.
+    */
+
+  }, {
+    key: "getDelayTimer",
+    value: function getDelayTimer() {
+      var code = this.code,
+          chip = this.chip;
+      var X = (code & 0x0F00) >> 8;
+      chip.registers[X] = this.delayTimer;
+      chip.pc += 2;
+    }
+    /*
+    	Opcode: FX15
+    	Sets the delay timer to VX.
+    */
+
+  }, {
+    key: "setDelayTimer",
+    value: function setDelayTimer() {
+      var code = this.code,
+          chip = this.chip;
+      var X = (code & 0x0F00) >> 8;
+      this.delayTimer = chip.registers[X];
+      chip.pc += 2;
+    }
+    /*
+    	Opcode: FX1E
+    	Adds VX to I. VF is not affected.
+    */
+
+  }, {
+    key: "addMem",
+    value: function addMem() {
+      var code = this.code,
+          chip = this.chip;
+      var X = (code & 0x0F00) >> 8;
+      chip.registerI += chip.registers[X]; // Limit to 16 bits
+
+      chip.registerI &= 0xFFFF;
+      chip.pc += 2;
+    }
+  }, {
+    key: "getInstructionName",
+    value: function getInstructionName() {
       var code = this.code; // The only 2 opcodes that can be matched exactly
 
       if (code === 0x00E0) {
-        return this.clear();
+        return 'clear';
       }
 
       if (code === 0x00EE) {
-        return this.returnFromSubroutine();
+        return 'returnFromSubroutine';
       } // Otherwise, opcodes depend on the first hex value (first 4 bits)
 
 
       switch (code & 0xF000) {
         case 0x1000:
           {
-            return this.jump();
+            return 'jump';
           }
 
         case 0x2000:
           {
-            return this.callSubroutine();
+            return 'callSubroutine';
           }
 
         case 0x3000:
           {
-            return this.skipIfRegisterEquals();
+            return 'skipIfRegisterEquals';
           }
 
         case 0x4000:
           {
-            return this.skipIfRegisterNotEquals();
+            return 'skipIfRegisterNotEquals';
           }
 
         case 0x5000:
           {
-            return this.skipIfRegistersEqual();
+            return 'skipIfRegistersEqual';
           }
 
         case 0x6000:
           {
-            return this.setRegisterValue();
+            return 'setRegisterValue';
           }
 
         case 0x7000:
           {
-            return this.addToRegisterValue();
+            return 'addToRegisterValue';
           }
 
         /*
@@ -674,73 +807,106 @@ var Instruction = /*#__PURE__*/function () {
             switch (code & 0x000F) {
               case 0x0:
                 {
-                  return this.assign();
+                  return 'assign';
                 }
 
               case 0x1:
                 {
-                  return this.bitwiseOr();
+                  return 'bitwiseOr';
                 }
 
               case 0x2:
                 {
-                  return this.bitwiseAnd();
+                  return 'bitwiseAnd';
                 }
 
               case 0x3:
                 {
-                  return this.bitwiseXor();
+                  return 'bitwiseXor';
                 }
 
               case 0x4:
                 {
-                  return this.add();
+                  return 'add';
                 }
 
               case 0x5:
                 {
-                  return this.subtract();
+                  return 'subtract';
                 }
 
               case 0x6:
                 {
-                  return this.shiftRight();
+                  return 'shiftRight';
                 }
 
               case 0x7:
                 {
-                  return this.subtractRegisters();
+                  return 'subtractRegisters';
                 }
 
               case 0xE:
                 {
-                  return this.shiftLeft();
+                  return 'shiftLeft';
                 }
             }
           }
 
         case 0x9000:
           {
-            return this.skipIfRegistersNotEqual();
+            return 'skipIfRegistersNotEqual';
           }
 
         case 0xA000:
           {
-            return this.setMemoryRegister();
+            return 'setMemoryRegister';
           }
 
         case 0xB000:
           {
-            return this.jumpV0();
+            return 'jumpV0';
           }
 
         case 0xC000:
           {
-            return this.rand();
+            return 'rand';
+          }
+
+        case 0xD000:
+          {
+            return 'draw';
+          }
+
+        case 0xF000:
+          {
+            // For F opcodes, the last 2 bits are the identifiers
+            switch (code & 0x00FF) {
+              case 0x07:
+                {
+                  return 'getDelayTimer';
+                }
+
+              case 0x15:
+                {
+                  return 'getDelayTimer';
+                }
+
+              case 0x1E:
+                {
+                  return 'addMem';
+                }
+            }
           }
       }
 
-      throw new Error('Unknown instruction: 0x' + code.toString(16));
+      throw new Error('Unknown instruction: 0x' + hex(code));
+    }
+  }, {
+    key: "execute",
+    value: function execute() {
+      var name = this.getInstructionName();
+      console.log('Executing instruction:', name);
+      this[name]();
     }
   }]);
 
@@ -760,8 +926,9 @@ var Instruction = /*#__PURE__*/function () {
 __webpack_require__.r(__webpack_exports__);
 /* harmony import */ var _chip_8_Chip__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ./chip-8/Chip */ "./src/chip-8/Chip.js");
 
-var chip = new _chip_8_Chip__WEBPACK_IMPORTED_MODULE_0__.default('canvas'); // chip.loadRomFromFile('./chip8-roms/games/Tetris [Fran Dachille, 1991].ch8')
-
+var chip = new _chip_8_Chip__WEBPACK_IMPORTED_MODULE_0__.default('canvas');
+chip.init();
+chip.loadRomFromFile('./chip8-roms/programs/Fishie [Hap, 2005].ch8');
 window._chip = chip;
 
 /***/ })
