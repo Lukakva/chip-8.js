@@ -1,3 +1,4 @@
+import Screen from './Screen'
 import Instruction from './Instruction'
 
 const RAM_SIZE = 4 * 1024 // 4 KB
@@ -11,13 +12,38 @@ const SCREEN_WIDTH = 64
 const SCREEN_HEIGHT = 32
 
 class Chip8 {
-	constructor(canvasSelector) {
-		this.canvas = document.querySelector(canvasSelector)
+	constructor(options) {
+		this.canvas = document.querySelector(options.canvas)
 		if (!this.canvas) {
-			throw new Error('Canvas not found:', canvasSelector)
+			throw new Error('Canvas not found:', options.canvas)
 		}
+	}
 
-		this.ctx = this.canvas.getContext('2d')
+	loadFontSet() {
+		// A list of sprites for all 16 hex characters
+		const font = [
+	        0xF0, 0x90, 0x90, 0x90, 0xF0, // 0
+	        0x20, 0x60, 0x20, 0x20, 0x70, // 1
+	        0xF0, 0x10, 0xF0, 0x80, 0xF0, // 2
+	        0xF0, 0x10, 0xF0, 0x10, 0xF0, // 3
+	        0x90, 0x90, 0xF0, 0x10, 0x10, // 4
+	        0xF0, 0x80, 0xF0, 0x10, 0xF0, // 5
+	        0xF0, 0x80, 0xF0, 0x90, 0xF0, // 6
+	        0xF0, 0x10, 0x20, 0x40, 0x40, // 7
+	        0xF0, 0x90, 0xF0, 0x90, 0xF0, // 8
+	        0xF0, 0x90, 0xF0, 0x10, 0xF0, // 9
+	        0xF0, 0x90, 0xF0, 0x90, 0x90, // A
+	        0xE0, 0x90, 0xE0, 0x90, 0xE0, // B
+	        0xF0, 0x80, 0x80, 0x80, 0xF0, // C
+	        0xE0, 0x90, 0x90, 0x90, 0xE0, // D
+	        0xF0, 0x80, 0xF0, 0x80, 0xF0, // E
+	        0xF0, 0x80, 0xF0, 0x80, 0x80  // F
+	    ]
+
+	    // Fonts are stored at the beginning of the memory
+	    for (let i = 0; i < font.length; i++) {
+	    	this.memory[i] = font[i]
+	    }
 	}
 
 	init() {
@@ -26,6 +52,7 @@ class Chip8 {
 			(in order of the Wikipedia article)
 		*/
 		this.memory = new Uint16Array(RAM_SIZE)
+		this.loadFontSet()
 
 		/*
 			15 general purpose 8-bit registers (V0-VE)
@@ -39,6 +66,7 @@ class Chip8 {
 		/* Program counter, stack pointer */
 		this.pc = PROGRAM_START
 		this.sp = 0
+		this.halted = false
 
 		/* The stack (for subroutine calls) */
 		this.stack = new Uint16Array(STACK_SIZE)
@@ -47,16 +75,12 @@ class Chip8 {
 		this.delayTimer = 0
 		this.soundTimer = 0
 
-		/* An array of Uint8Arrays. Storing just 0s and 1s (black and white) */
-		this.screen = new Array(SCREEN_HEIGHT)
-		for (let i = 0; i < SCREEN_HEIGHT; i++) {
-			this.screen[i] = new Uint8Array(SCREEN_WIDTH)
-		}
-
-		this.canvas.width = SCREEN_WIDTH
-		this.canvas.height = SCREEN_HEIGHT
-		this.canvas.style.imageRendering = 'pixelated'
-		this.refreshDisplay()
+		/*
+			A class for storing 0s and 1s (black and white)
+			but also rendering on canvas
+		*/
+		this.screen = new Screen(SCREEN_WIDTH, SCREEN_HEIGHT, this.canvas)
+		this.keyboard = new Uint8Array(16)
 	}
 
 	/* Just a cool debugging thing */
@@ -131,37 +155,62 @@ class Chip8 {
 		instruction.execute()
 	}
 
-	refreshDisplay() {
-		const { ctx, screen } = this
-
-		ctx.fillStyle = 'black'
-		ctx.fillRect(0, 0, screen[0].length, screen.length)
-
-		ctx.fillStyle = 'white'
-
-		let filled = 0
-		for (let y = 0; y < 32; y++) {
-			for (let x = 0; x < 64; x++) {
-				// Draw a white pixel where necessary
-				if (screen[y][x] == 1) {
-					ctx.fillRect(x, y, 1, 1)
-				}
-			}
+	/*
+		Key: a string containing the value of the button
+		(1, 2, 3, 4, ..., F)
+	*/
+	onKeyDown(key) {
+		console.log(key + ' was pressed')
+		// Since we have a hex keyboard, we can just parse the index
+		const index = parseInt(key, 16)
+		if (isNaN(index) || index > 0xF) {
+			return
 		}
+
+		this.keyboard[key] = 1
+	}
+
+	onKeyUp(key) {
+		console.log(key + ' was released')
+		// Since we have a hex keyboard, we can just parse the index
+		const index = parseInt(key, 16)
+		if (isNaN(index) || index > 0xF) {
+			return
+		}
+
+		this.keyboard[key] = 0
 	}
 
 	/* A CPU cycle */
 	cycle() {
+		if (this.halted) {
+			return
+		}
+
 		const opcode = this.fetchOpcode()
-		this.executeOpcode(opcode)
+		try {
+			this.executeOpcode(opcode)
+		} catch (e) {
+			this.screen.renderFailure(e)
+			throw e
+		}
 
 		if (this.delayTimer > 0) {
 			this.delayTimer--
 		}
 
-		window.requestAnimationFrame(() => {
+		setTimeout(() => {
 			this.cycle()
-		})
+		}, 15)
+	}
+
+	start() {
+		this.halted = false
+		this.cycle()
+	}
+
+	pause() {
+		this.halted = true
 	}
 }
 

@@ -21,13 +21,13 @@ export default class Instruction {
 	clear() {
 		const { screen } = this.chip
 
-		for (let i = 0; i < screen.length; i++) {
-			for (let j = 0; j < screen[0].length; j++) {
-				screen[i][j] = 0
+		for (let y = 0; y < screen.height; y++) {
+			for (let x = 0; x < screen.width; x++) {
+				screen.pixels[y][x] = 0
 			}
 		}
 
-		this.chip.refreshDisplay()
+		screen.render()
 		this.chip.pc += 2
 	}
 
@@ -59,7 +59,9 @@ export default class Instruction {
 	jump() {
 		const NNN = this.code & 0x0FFF
 		if (this.chip.pc === NNN) {
-			throw new Error('Something went wrong. The program is jumping to the current Program Counter. Infinite loop is inevitable?')
+			this.chip.halted = true
+			return
+			throw new Error('Something went wrong. The jump instruction is jumping to the current Program Counter. This will cause an infinite loop. Halting')
 		}
 
 		this.chip.pc = NNN
@@ -394,7 +396,9 @@ export default class Instruction {
 			Each row of 8 pixels is read as bit-coded
 			starting from memory location I
 		*/
-		const { code, chip, chip: {registers, screen} } = this
+		const { code, chip } = this
+		const { registers, screen } = chip
+		const pixels = screen.pixels
 
 		const X = (code & 0x0F00) >> 8
 		const Y = (code & 0x00F0) >> 4
@@ -415,18 +419,51 @@ export default class Instruction {
 				const mask = 0x80 >> x
 				// If this pixel should be flipped
 				if ((row & mask) > 0) {
-					// This pixel was 1? It's gonna be 0 now. Set the VF register
-					if (screen[coordY + y][coordX + x] === 1) {
+					// Was this pixel a 1? It's gonna be 0 now. Set the VF register
+					if (pixels[coordY + y][coordX + x] === 1) {
 						registers[0xF] = 1
 					}
 
-					screen[coordY + y][coordX + x] ^= 1
+					pixels[coordY + y][coordX + x] ^= 1
 				}
 			}
 		}
 
-		chip.refreshDisplay()
+		screen.render()
 		chip.pc += 2
+	}
+
+	/*
+		Opcode: EX9E
+		Skips the next instruction if the key stored in VX is pressed.
+	*/
+	skipIfKeyPressed() {
+		const { code, chip } = this
+		const X = (code & 0x0F00) >> 8
+
+		const desiredKey = chip.registers[X]
+		if (chip.keyboard[desiredKey]) {
+			chip.pc += 4
+		} else {
+			chip.pc += 2
+		}
+	}
+
+	/*
+		Opcode: EX9E
+		Skips the next instruction if the key stored in VX isn't pressed.
+	*/
+	skipIfKeyNotPressed() {
+		const { code, chip } = this
+
+		const X = (code & 0x0F00) >> 8
+		const desiredKey = chip.registers[X]
+
+		if (!chip.keyboard[desiredKey]) {
+			chip.pc += 4
+		} else {
+			chip.pc += 2
+		}
 	}
 
 	/*
@@ -435,11 +472,36 @@ export default class Instruction {
 	*/
 	getDelayTimer() {
 		const { code, chip } = this
-
 		const X = (code & 0x0F00) >> 8
 
-		chip.registers[X] = this.delayTimer
+		chip.registers[X] = chip.delayTimer
 		chip.pc += 2
+	}
+
+	/*
+		Opcode: FX0A
+		A key press is awaited, and then stored in VX.
+		(Blocking operation)
+
+		TODO: Right now, the CPU gets basically stuck on this instruction
+		over and over until a key is pressed. Is that really the way to do it?
+		Maybe it's better to actually halt the CPU and resume the process once
+		a keypress occurs?
+		(Doesn't really seem like how a real CPU would do it tho)
+	*/
+	awaitKeyPress() {
+		const { code, chip } = this
+
+		const X = (code & 0x0F00) >> 8
+		for (let i = 0; i < chip.keyboard.length; i++) {
+			// If this key is pressed, only then proceed to the next instruction
+			// Until then, this instruction will be repeated
+			if (chip.keyboard[i]) {
+				chip.registers[X] = i
+				chip.pc += 2
+				return
+			}
+		}
 	}
 
 	/*
@@ -448,10 +510,21 @@ export default class Instruction {
 	*/
 	setDelayTimer() {
 		const { code, chip } = this
-
 		const X = (code & 0x0F00) >> 8
 
-		this.delayTimer = chip.registers[X]
+		chip.delayTimer = chip.registers[X]
+		chip.pc += 2
+	}
+
+	/*
+		Opcode: FX18
+		Sets the sound timer to VX.
+	*/
+	setSoundTimer() {
+		const { code, chip } = this
+		const X = (code & 0x0F00) >> 8
+
+		chip.soundTimer = chip.registers[X]
 		chip.pc += 2
 	}
 
@@ -466,6 +539,85 @@ export default class Instruction {
 		chip.registerI += chip.registers[X]
 		// Limit to 16 bits
 		chip.registerI &= 0xFFFF
+
+		chip.pc += 2
+	}
+
+	/*
+		Opcode: FX29
+		Sets I to the location of the sprite for the character in VX.
+		Characters 0-F (in hexadecimal) are represented by a 4x5 font.
+	*/
+	setCharacterInMemory() {
+		const { code, chip } = this
+
+		// Since all characters are a 5 byte sprite
+		// We can just multiply the character index by 5
+		// to move to the correct memory location
+		const X = (code & 0x0F00) >> 8
+		chip.registerI = chip.registers[X] * 0x5
+		chip.pc += 2
+	}
+
+	/*
+		Opcode: FX33
+		Stores the binary-coded decimal representation of VX,
+		with the mostsignificant of three digits at the address in I,
+		the middle digit at I plus 1,
+		and the least significant digit at I plus 2.
+		(In other words, take the decimal representation of VX,
+		place the hundreds digit in memory at location in I,
+		the tens digit at location I+1,
+		and the ones digit at location I+2.)
+	*/
+	storeBCD() {
+		const { code, chip } = this
+
+		const X = (code & 0x0F00) >> 8
+		const N = chip.registers[X]
+		const I = chip.registerI
+
+		chip.registers[I + 0] = N / 100 		// 100
+		chip.registers[I + 1] = (N % 100) / 10 	// 10
+		chip.registers[I + 2] = N % 10 			// 1
+
+		console.log('BCD', N, N / 100, (N % 100) / 10, N % 10)
+
+		chip.pc += 2
+	}
+
+	/*
+		Opcode: FX55
+		Stores V0 to VX (including VX) in memory starting at address I.
+		The offset from I is increased by 1 for each value written,
+		but I itself is left unmodified.
+		(Meaning the I register is not modified)
+	*/
+	dumpRegisters() {
+		const { code, chip, chip: {registers} } = this
+
+		const X = (code & 0x0F00) >> 8
+		for (let i = 0; i <= X; i++) {
+			registers[chip.registerI + i] = registers[i]
+		}
+
+		chip.pc += 2
+	}
+
+	/*
+		Opcode: FX65
+		Fills V0 to VX (including VX) with values from memory starting
+		at address I.
+		The offset from I is increased by 1 for each value written,
+		but I itself is left unmodified.
+	*/
+	loadRegisters() {
+		const { code, chip, chip: {registers} } = this
+
+		const X = (code & 0x0F00) >> 8
+		for (let i = 0; i <= X; i++) {
+			registers[i] = registers[chip.registerI + i]
+		}
 
 		chip.pc += 2
 	}
@@ -576,6 +728,18 @@ export default class Instruction {
 				return 'draw'
 			}
 
+			case 0xE000: {
+				switch (code & 0x00FF) {
+					case 0x9E: {
+						return 'skipIfKeyPressed'
+					}
+
+					case 0xA1: {
+						return 'skipIfKeyNotPressed'
+					}
+				}
+			}
+
 			case 0xF000: {
 				// For F opcodes, the last 2 bits are the identifiers
 				switch (code & 0x00FF) {
@@ -583,18 +747,42 @@ export default class Instruction {
 						return 'getDelayTimer'
 					}
 
+					case 0x0A: {
+						return 'awaitKeyPress'
+					}
+
 					case 0x15: {
 						return 'getDelayTimer'
+					}
+
+					case 0x18: {
+						return 'setSoundTimer'
 					}
 
 					case 0x1E: {
 						return 'addMem'
 					}
+
+					case 0x29: {
+						return 'setCharacterInMemory'
+					}
+
+					case 0x33: {
+						return 'storeBCD'
+					}
+
+					case 0x55: {
+						return 'dumpRegisters'
+					}
+
+					case 0x65: {
+						return 'loadRegisters'
+					}
 				}
 			}
 		}
 
-		throw new Error('Unknown instruction: 0x' + hex(code))
+		throw new Error('Unknown instruction: ' + hex(code))
 	}
 
 	execute() {

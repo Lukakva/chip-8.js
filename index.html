@@ -1,23 +1,108 @@
 <!DOCTYPE html>
 <html>
-	<head>
-		<meta charset="utf-8" />
-		<title>Getting Started</title>
-		<style>
-			html, body {
-				margin: 0;
-				padding: 0;
-				height: 100%;
-				width: 100%;
-			}
+<head>
+	<meta charset="utf-8" />
+	<title>Getting Started</title>
+</head>
+<style>
 
-			canvas {
-				width: 100%;
-			}
-		</style>
-	</head>
+html, body {
+	margin: 0;
+	padding: 0;
+	height: 100%;
+	width: 100%;
+}
+
+#wrapper {
+	display: flex;
+	max-height: 100%;
+
+	flex-direction: column;
+	align-items: center;
+	justify-content: center;
+
+	overflow: hidden;
+}
+
+* {
+	box-sizing: border-box;
+	font-family: monospace;
+}
+
+canvas {
+	border: 1px solid black;
+	max-width: 100%;
+}
+
+#keyboard {
+	display: flex;
+	flex-direction: column;
+	border: 1px solid rgba(0, 0, 0, 0.2);
+}
+
+.row {
+	display: flex;
+}
+
+.row:last-child .button {
+	margin-bottom: 8px;
+}
+
+.button {
+	width: 40px;
+	height: 40px;
+	text-align: center;
+	line-height: 30px;
+
+	padding: 5px;
+	margin: 5px;
+
+	background: rgba(0, 0, 0, 0.1);
+	cursor: pointer;
+	box-shadow: 0 3px rgba(0, 0, 0, 0.2);
+}
+
+.button:hover {
+
+}
+
+.button:active {
+	margin-top: 8px;
+	margin-bottom: 2px;
+	box-shadow: none;
+}
+
+</style>
 <body>
-	<canvas />
+	<div id="wrapper">
+		<canvas></canvas>
+		<div id="keyboard">
+			<div class="row">
+				<div class="button">1</div>
+				<div class="button">2</div>
+				<div class="button">3</div>
+				<div class="button">C</div>
+			</div>
+			<div class="row">
+				<div class="button">4</div>
+				<div class="button">5</div>
+				<div class="button">6</div>
+				<div class="button">D</div>
+			</div>
+			<div class="row">
+				<div class="button">7</div>
+				<div class="button">8</div>
+				<div class="button">9</div>
+				<div class="button">E</div>
+			</div>
+			<div class="row">
+				<div class="button">A</div>
+				<div class="button">0</div>
+				<div class="button">B</div>
+				<div class="button">F</div>
+			</div>
+		</div>
+	</div>
 </body>
 <script src="./dist/index.bundle.js"></script>
 </html>

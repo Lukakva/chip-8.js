@@ -12,12 +12,14 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony export */ __webpack_require__.d(__webpack_exports__, {
 /* harmony export */   "default": () => __WEBPACK_DEFAULT_EXPORT__
 /* harmony export */ });
-/* harmony import */ var _Instruction__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ./Instruction */ "./src/chip-8/Instruction.js");
+/* harmony import */ var _Screen__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ./Screen */ "./src/chip-8/Screen.js");
+/* harmony import */ var _Instruction__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ./Instruction */ "./src/chip-8/Instruction.js");
 function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
 
 function _defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if ("value" in descriptor) descriptor.writable = true; Object.defineProperty(target, descriptor.key, descriptor); } }
 
 function _createClass(Constructor, protoProps, staticProps) { if (protoProps) _defineProperties(Constructor.prototype, protoProps); if (staticProps) _defineProperties(Constructor, staticProps); return Constructor; }
+
 
 
 var RAM_SIZE = 4 * 1024; // 4 KB
@@ -31,19 +33,43 @@ var SCREEN_WIDTH = 64;
 var SCREEN_HEIGHT = 32;
 
 var Chip8 = /*#__PURE__*/function () {
-  function Chip8(canvasSelector) {
+  function Chip8(options) {
     _classCallCheck(this, Chip8);
 
-    this.canvas = document.querySelector(canvasSelector);
+    this.canvas = document.querySelector(options.canvas);
 
     if (!this.canvas) {
-      throw new Error('Canvas not found:', canvasSelector);
+      throw new Error('Canvas not found:', options.canvas);
     }
-
-    this.ctx = this.canvas.getContext('2d');
   }
 
   _createClass(Chip8, [{
+    key: "loadFontSet",
+    value: function loadFontSet() {
+      // A list of sprites for all 16 hex characters
+      var font = [0xF0, 0x90, 0x90, 0x90, 0xF0, // 0
+      0x20, 0x60, 0x20, 0x20, 0x70, // 1
+      0xF0, 0x10, 0xF0, 0x80, 0xF0, // 2
+      0xF0, 0x10, 0xF0, 0x10, 0xF0, // 3
+      0x90, 0x90, 0xF0, 0x10, 0x10, // 4
+      0xF0, 0x80, 0xF0, 0x10, 0xF0, // 5
+      0xF0, 0x80, 0xF0, 0x90, 0xF0, // 6
+      0xF0, 0x10, 0x20, 0x40, 0x40, // 7
+      0xF0, 0x90, 0xF0, 0x90, 0xF0, // 8
+      0xF0, 0x90, 0xF0, 0x10, 0xF0, // 9
+      0xF0, 0x90, 0xF0, 0x90, 0x90, // A
+      0xE0, 0x90, 0xE0, 0x90, 0xE0, // B
+      0xF0, 0x80, 0x80, 0x80, 0xF0, // C
+      0xE0, 0x90, 0x90, 0x90, 0xE0, // D
+      0xF0, 0x80, 0xF0, 0x80, 0xF0, // E
+      0xF0, 0x80, 0xF0, 0x80, 0x80 // F
+      ]; // Fonts are stored at the beginning of the memory
+
+      for (var i = 0; i < font.length; i++) {
+        this.memory[i] = font[i];
+      }
+    }
+  }, {
     key: "init",
     value: function init() {
       /*
@@ -51,6 +77,7 @@ var Chip8 = /*#__PURE__*/function () {
       	(in order of the Wikipedia article)
       */
       this.memory = new Uint16Array(RAM_SIZE);
+      this.loadFontSet();
       /*
       	15 general purpose 8-bit registers (V0-VE)
       	+ 1 carry flag register (VF)
@@ -64,6 +91,7 @@ var Chip8 = /*#__PURE__*/function () {
 
       this.pc = PROGRAM_START;
       this.sp = 0;
+      this.halted = false;
       /* The stack (for subroutine calls) */
 
       this.stack = new Uint16Array(STACK_SIZE);
@@ -71,18 +99,13 @@ var Chip8 = /*#__PURE__*/function () {
 
       this.delayTimer = 0;
       this.soundTimer = 0;
-      /* An array of Uint8Arrays. Storing just 0s and 1s (black and white) */
+      /*
+      	A class for storing 0s and 1s (black and white)
+      	but also rendering on canvas
+      */
 
-      this.screen = new Array(SCREEN_HEIGHT);
-
-      for (var i = 0; i < SCREEN_HEIGHT; i++) {
-        this.screen[i] = new Uint8Array(SCREEN_WIDTH);
-      }
-
-      this.canvas.width = SCREEN_WIDTH;
-      this.canvas.height = SCREEN_HEIGHT;
-      this.canvas.style.imageRendering = 'pixelated';
-      this.refreshDisplay();
+      this.screen = new _Screen__WEBPACK_IMPORTED_MODULE_0__.default(SCREEN_WIDTH, SCREEN_HEIGHT, this.canvas);
+      this.keyboard = new Uint8Array(16);
     }
     /* Just a cool debugging thing */
 
@@ -167,27 +190,39 @@ var Chip8 = /*#__PURE__*/function () {
   }, {
     key: "executeOpcode",
     value: function executeOpcode(opcode) {
-      var instruction = new _Instruction__WEBPACK_IMPORTED_MODULE_0__.default(opcode, this);
+      var instruction = new _Instruction__WEBPACK_IMPORTED_MODULE_1__.default(opcode, this);
       instruction.execute();
     }
-  }, {
-    key: "refreshDisplay",
-    value: function refreshDisplay() {
-      var ctx = this.ctx,
-          screen = this.screen;
-      ctx.fillStyle = 'black';
-      ctx.fillRect(0, 0, screen[0].length, screen.length);
-      ctx.fillStyle = 'white';
-      var filled = 0;
+    /*
+    	Key: a string containing the value of the button
+    	(1, 2, 3, 4, ..., F)
+    */
 
-      for (var y = 0; y < 32; y++) {
-        for (var x = 0; x < 64; x++) {
-          // Draw a white pixel where necessary
-          if (screen[y][x] == 1) {
-            ctx.fillRect(x, y, 1, 1);
-          }
-        }
+  }, {
+    key: "onKeyDown",
+    value: function onKeyDown(key) {
+      console.log(key + ' was pressed'); // Since we have a hex keyboard, we can just parse the index
+
+      var index = parseInt(key, 16);
+
+      if (isNaN(index) || index > 0xF) {
+        return;
       }
+
+      this.keyboard[key] = 1;
+    }
+  }, {
+    key: "onKeyUp",
+    value: function onKeyUp(key) {
+      console.log(key + ' was released'); // Since we have a hex keyboard, we can just parse the index
+
+      var index = parseInt(key, 16);
+
+      if (isNaN(index) || index > 0xF) {
+        return;
+      }
+
+      this.keyboard[key] = 0;
     }
     /* A CPU cycle */
 
@@ -196,16 +231,37 @@ var Chip8 = /*#__PURE__*/function () {
     value: function cycle() {
       var _this2 = this;
 
+      if (this.halted) {
+        return;
+      }
+
       var opcode = this.fetchOpcode();
-      this.executeOpcode(opcode);
+
+      try {
+        this.executeOpcode(opcode);
+      } catch (e) {
+        this.screen.renderFailure(e);
+        throw e;
+      }
 
       if (this.delayTimer > 0) {
         this.delayTimer--;
       }
 
-      window.requestAnimationFrame(function () {
+      setTimeout(function () {
         _this2.cycle();
-      });
+      }, 15);
+    }
+  }, {
+    key: "start",
+    value: function start() {
+      this.halted = false;
+      this.cycle();
+    }
+  }, {
+    key: "pause",
+    value: function pause() {
+      this.halted = true;
     }
   }]);
 
@@ -261,13 +317,13 @@ var Instruction = /*#__PURE__*/function () {
     value: function clear() {
       var screen = this.chip.screen;
 
-      for (var i = 0; i < screen.length; i++) {
-        for (var j = 0; j < screen[0].length; j++) {
-          screen[i][j] = 0;
+      for (var y = 0; y < screen.height; y++) {
+        for (var x = 0; x < screen.width; x++) {
+          screen.pixels[y][x] = 0;
         }
       }
 
-      this.chip.refreshDisplay();
+      screen.render();
       this.chip.pc += 2;
     }
     /*
@@ -302,7 +358,9 @@ var Instruction = /*#__PURE__*/function () {
       var NNN = this.code & 0x0FFF;
 
       if (this.chip.pc === NNN) {
-        throw new Error('Something went wrong. The program is jumping to the current Program Counter. Infinite loop is inevitable?');
+        this.chip.halted = true;
+        return;
+        throw new Error('Something went wrong. The jump instruction is jumping to the current Program Counter. This will cause an infinite loop. Halting');
       }
 
       this.chip.pc = NNN;
@@ -669,10 +727,10 @@ var Instruction = /*#__PURE__*/function () {
       	starting from memory location I
       */
       var code = this.code,
-          chip = this.chip,
-          _this$chip = this.chip,
-          registers = _this$chip.registers,
-          screen = _this$chip.screen;
+          chip = this.chip;
+      var registers = chip.registers,
+          screen = chip.screen;
+      var pixels = screen.pixels;
       var X = (code & 0x0F00) >> 8;
       var Y = (code & 0x00F0) >> 4;
       var N = code & 0x000F;
@@ -689,18 +747,56 @@ var Instruction = /*#__PURE__*/function () {
           var mask = 0x80 >> x; // If this pixel should be flipped
 
           if ((row & mask) > 0) {
-            // This pixel was 1? It's gonna be 0 now. Set the VF register
-            if (screen[coordY + y][coordX + x] === 1) {
+            // Was this pixel a 1? It's gonna be 0 now. Set the VF register
+            if (pixels[coordY + y][coordX + x] === 1) {
               registers[0xF] = 1;
             }
 
-            screen[coordY + y][coordX + x] ^= 1;
+            pixels[coordY + y][coordX + x] ^= 1;
           }
         }
       }
 
-      chip.refreshDisplay();
+      screen.render();
       chip.pc += 2;
+    }
+    /*
+    	Opcode: EX9E
+    	Skips the next instruction if the key stored in VX is pressed.
+    */
+
+  }, {
+    key: "skipIfKeyPressed",
+    value: function skipIfKeyPressed() {
+      var code = this.code,
+          chip = this.chip;
+      var X = (code & 0x0F00) >> 8;
+      var desiredKey = chip.registers[X];
+
+      if (chip.keyboard[desiredKey]) {
+        chip.pc += 4;
+      } else {
+        chip.pc += 2;
+      }
+    }
+    /*
+    	Opcode: EX9E
+    	Skips the next instruction if the key stored in VX isn't pressed.
+    */
+
+  }, {
+    key: "skipIfKeyNotPressed",
+    value: function skipIfKeyNotPressed() {
+      var code = this.code,
+          chip = this.chip;
+      var X = (code & 0x0F00) >> 8;
+      var desiredKey = chip.registers[X];
+
+      if (!chip.keyboard[desiredKey]) {
+        chip.pc += 4;
+      } else {
+        chip.pc += 2;
+      }
     }
     /*
     	Opcode: FX07
@@ -713,8 +809,36 @@ var Instruction = /*#__PURE__*/function () {
       var code = this.code,
           chip = this.chip;
       var X = (code & 0x0F00) >> 8;
-      chip.registers[X] = this.delayTimer;
+      chip.registers[X] = chip.delayTimer;
       chip.pc += 2;
+    }
+    /*
+    	Opcode: FX0A
+    	A key press is awaited, and then stored in VX.
+    	(Blocking operation)
+    		TODO: Right now, the CPU gets basically stuck on this instruction
+    	over and over until a key is pressed. Is that really the way to do it?
+    	Maybe it's better to actually halt the CPU and resume the process once
+    	a keypress occurs?
+    	(Doesn't really seem like how a real CPU would do it tho)
+    */
+
+  }, {
+    key: "awaitKeyPress",
+    value: function awaitKeyPress() {
+      var code = this.code,
+          chip = this.chip;
+      var X = (code & 0x0F00) >> 8;
+
+      for (var i = 0; i < chip.keyboard.length; i++) {
+        // If this key is pressed, only then proceed to the next instruction
+        // Until then, this instruction will be repeated
+        if (chip.keyboard[i]) {
+          chip.registers[X] = i;
+          chip.pc += 2;
+          return;
+        }
+      }
     }
     /*
     	Opcode: FX15
@@ -727,7 +851,21 @@ var Instruction = /*#__PURE__*/function () {
       var code = this.code,
           chip = this.chip;
       var X = (code & 0x0F00) >> 8;
-      this.delayTimer = chip.registers[X];
+      chip.delayTimer = chip.registers[X];
+      chip.pc += 2;
+    }
+    /*
+    	Opcode: FX18
+    	Sets the sound timer to VX.
+    */
+
+  }, {
+    key: "setSoundTimer",
+    value: function setSoundTimer() {
+      var code = this.code,
+          chip = this.chip;
+      var X = (code & 0x0F00) >> 8;
+      chip.soundTimer = chip.registers[X];
       chip.pc += 2;
     }
     /*
@@ -744,6 +882,97 @@ var Instruction = /*#__PURE__*/function () {
       chip.registerI += chip.registers[X]; // Limit to 16 bits
 
       chip.registerI &= 0xFFFF;
+      chip.pc += 2;
+    }
+    /*
+    	Opcode: FX29
+    	Sets I to the location of the sprite for the character in VX.
+    	Characters 0-F (in hexadecimal) are represented by a 4x5 font.
+    */
+
+  }, {
+    key: "setCharacterInMemory",
+    value: function setCharacterInMemory() {
+      var code = this.code,
+          chip = this.chip; // Since all characters are a 5 byte sprite
+      // We can just multiply the character index by 5
+      // to move to the correct memory location
+
+      var X = (code & 0x0F00) >> 8;
+      chip.registerI = chip.registers[X] * 0x5;
+      chip.pc += 2;
+    }
+    /*
+    	Opcode: FX33
+    	Stores the binary-coded decimal representation of VX,
+    	with the mostsignificant of three digits at the address in I,
+    	the middle digit at I plus 1,
+    	and the least significant digit at I plus 2.
+    	(In other words, take the decimal representation of VX,
+    	place the hundreds digit in memory at location in I,
+    	the tens digit at location I+1,
+    	and the ones digit at location I+2.)
+    */
+
+  }, {
+    key: "storeBCD",
+    value: function storeBCD() {
+      var code = this.code,
+          chip = this.chip;
+      var X = (code & 0x0F00) >> 8;
+      var N = chip.registers[X];
+      var I = chip.registerI;
+      chip.registers[I + 0] = N / 100; // 100
+
+      chip.registers[I + 1] = N % 100 / 10; // 10
+
+      chip.registers[I + 2] = N % 10; // 1
+
+      console.log('BCD', N, N / 100, N % 100 / 10, N % 10);
+      chip.pc += 2;
+    }
+    /*
+    	Opcode: FX55
+    	Stores V0 to VX (including VX) in memory starting at address I.
+    	The offset from I is increased by 1 for each value written,
+    	but I itself is left unmodified.
+    	(Meaning the I register is not modified)
+    */
+
+  }, {
+    key: "dumpRegisters",
+    value: function dumpRegisters() {
+      var code = this.code,
+          chip = this.chip,
+          registers = this.chip.registers;
+      var X = (code & 0x0F00) >> 8;
+
+      for (var i = 0; i <= X; i++) {
+        registers[chip.registerI + i] = registers[i];
+      }
+
+      chip.pc += 2;
+    }
+    /*
+    	Opcode: FX65
+    	Fills V0 to VX (including VX) with values from memory starting
+    	at address I.
+    	The offset from I is increased by 1 for each value written,
+    	but I itself is left unmodified.
+    */
+
+  }, {
+    key: "loadRegisters",
+    value: function loadRegisters() {
+      var code = this.code,
+          chip = this.chip,
+          registers = this.chip.registers;
+      var X = (code & 0x0F00) >> 8;
+
+      for (var i = 0; i <= X; i++) {
+        registers[i] = registers[chip.registerI + i];
+      }
+
       chip.pc += 2;
     }
   }, {
@@ -877,6 +1106,21 @@ var Instruction = /*#__PURE__*/function () {
             return 'draw';
           }
 
+        case 0xE000:
+          {
+            switch (code & 0x00FF) {
+              case 0x9E:
+                {
+                  return 'skipIfKeyPressed';
+                }
+
+              case 0xA1:
+                {
+                  return 'skipIfKeyNotPressed';
+                }
+            }
+          }
+
         case 0xF000:
           {
             // For F opcodes, the last 2 bits are the identifiers
@@ -886,20 +1130,50 @@ var Instruction = /*#__PURE__*/function () {
                   return 'getDelayTimer';
                 }
 
+              case 0x0A:
+                {
+                  return 'awaitKeyPress';
+                }
+
               case 0x15:
                 {
                   return 'getDelayTimer';
+                }
+
+              case 0x18:
+                {
+                  return 'setSoundTimer';
                 }
 
               case 0x1E:
                 {
                   return 'addMem';
                 }
+
+              case 0x29:
+                {
+                  return 'setCharacterInMemory';
+                }
+
+              case 0x33:
+                {
+                  return 'storeBCD';
+                }
+
+              case 0x55:
+                {
+                  return 'dumpRegisters';
+                }
+
+              case 0x65:
+                {
+                  return 'loadRegisters';
+                }
             }
           }
       }
 
-      throw new Error('Unknown instruction: 0x' + hex(code));
+      throw new Error('Unknown instruction: ' + hex(code));
     }
   }, {
     key: "execute",
@@ -917,6 +1191,135 @@ var Instruction = /*#__PURE__*/function () {
 
 /***/ }),
 
+/***/ "./src/chip-8/Screen.js":
+/*!******************************!*\
+  !*** ./src/chip-8/Screen.js ***!
+  \******************************/
+/***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
+
+__webpack_require__.r(__webpack_exports__);
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   "default": () => /* binding */ Screen
+/* harmony export */ });
+function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
+
+function _defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if ("value" in descriptor) descriptor.writable = true; Object.defineProperty(target, descriptor.key, descriptor); } }
+
+function _createClass(Constructor, protoProps, staticProps) { if (protoProps) _defineProperties(Constructor.prototype, protoProps); if (staticProps) _defineProperties(Constructor, staticProps); return Constructor; }
+
+/*
+	This class doesn't really implement any of the graphics logic
+	All of that is still in the Instruction.js file. This is a pure bridge
+	between the Chip8 and the Canvas and provides some additional features
+	(like rendering error messages on exceptions)
+*/
+var RESOLUTION = 16;
+
+var Screen = /*#__PURE__*/function () {
+  function Screen(width, height, canvas) {
+    _classCallCheck(this, Screen);
+
+    this.height = height;
+    this.width = width;
+    this.canvas = canvas;
+    this.canvas.width = width * RESOLUTION;
+    this.canvas.height = height * RESOLUTION; // this.canvas.style.imageRendering = 'pixelated'
+
+    this.ctx = canvas.getContext('2d');
+    this.pixels = new Array(height);
+
+    for (var i = 0; i < height; i++) {
+      this.pixels[i] = new Uint8Array(width);
+    }
+  }
+  /*
+  	https://stackoverflow.com/a/16599668/7214615
+  */
+
+
+  _createClass(Screen, [{
+    key: "getLines",
+    value: function getLines(ctx, text, maxWidth) {
+      var words = text.split(' ');
+      var lines = [];
+      var currentLine = words[0];
+
+      for (var i = 1; i < words.length; i++) {
+        var word = words[i];
+        var width = ctx.measureText(currentLine + ' ' + word).width;
+
+        if (width < maxWidth) {
+          currentLine += ' ' + word;
+        } else {
+          lines.push(currentLine);
+          currentLine = word;
+        }
+      }
+
+      lines.push(currentLine);
+      return lines;
+    }
+  }, {
+    key: "renderFailure",
+    value: function renderFailure(error) {
+      var canvas = this.canvas,
+          ctx = this.ctx;
+      var title = 'The emulator aborted with the following error :(';
+      var x = canvas.width / 2;
+      var y = canvas.height / 2;
+      ctx.fillStyle = 'black';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.font = RESOLUTION + 'px monospace';
+      ctx.fillStyle = 'red';
+      ctx.textAlign = 'center';
+      ctx.fillText(title, x, y);
+      y += RESOLUTION;
+      var lines = this.getLines(ctx, error.message, canvas.width - 10);
+      lines.forEach(function (line) {
+        ctx.textBaseline = 'top';
+        ctx.fillText(line, x, y);
+        y += 20;
+      });
+    }
+    /*
+    	A seperate function so that rendering can have a complex logic
+    	A single pixel is scaled to the value of the RESOLUTION
+    */
+
+  }, {
+    key: "renderPixel",
+    value: function renderPixel(x, y) {
+      x *= RESOLUTION;
+      y *= RESOLUTION;
+      this.ctx.fillStyle = 'white';
+      this.ctx.fillRect(x + 1, y + 1, RESOLUTION - 2, RESOLUTION - 2);
+    }
+  }, {
+    key: "render",
+    value: function render() {
+      var ctx = this.ctx;
+      ctx.fillStyle = 'black';
+      ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+      ctx.fillStyle = 'white';
+
+      for (var y = 0; y < this.height; y++) {
+        for (var x = 0; x < this.width; x++) {
+          // Draw a white pixel where necessary
+          if (this.pixels[y][x] == 1) {
+            this.renderPixel(x, y);
+          }
+        }
+      }
+    }
+  }]);
+
+  return Screen;
+}();
+
+
+
+/***/ }),
+
 /***/ "./src/index.js":
 /*!**********************!*\
   !*** ./src/index.js ***!
@@ -926,9 +1329,33 @@ var Instruction = /*#__PURE__*/function () {
 __webpack_require__.r(__webpack_exports__);
 /* harmony import */ var _chip_8_Chip__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ./chip-8/Chip */ "./src/chip-8/Chip.js");
 
-var chip = new _chip_8_Chip__WEBPACK_IMPORTED_MODULE_0__.default('canvas');
+var chip = new _chip_8_Chip__WEBPACK_IMPORTED_MODULE_0__.default({
+  canvas: 'canvas',
+  keyboard: '#keyboard'
+});
 chip.init();
-chip.loadRomFromFile('./chip8-roms/programs/Fishie [Hap, 2005].ch8');
+chip.loadRomFromFile('./chip8-roms/games/Bowling [Gooitzen van der Wal].ch8');
+var buttons = document.querySelectorAll('.button');
+
+var _loop = function _loop(i) {
+  var button = buttons[i];
+
+  button.onmousedown = function () {
+    chip.onKeyDown(button.innerText.trim());
+  };
+
+  button.onmouseup = function () {
+    chip.onKeyUp(button.innerText.trim());
+  };
+};
+
+for (var i = 0; i < buttons.length; i++) {
+  _loop(i);
+}
+
+setTimeout(function () {
+  return chip.start();
+}, 1000);
 window._chip = chip;
 
 /***/ })
