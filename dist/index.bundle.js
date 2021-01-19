@@ -44,6 +44,8 @@ var Chip8 = /*#__PURE__*/function () {
     if (!this.canvas) {
       throw new Error('Canvas not found:', options.canvas);
     }
+
+    this.audioContext = new (AudioContext || webkitAudioContext)();
   }
 
   _createClass(Chip8, [{
@@ -257,11 +259,10 @@ var Chip8 = /*#__PURE__*/function () {
         return;
       }
 
-      var audioContext = new (AudioContext || webkitAudioContext)();
-      var oscillator = audioContext.createOscillator();
-      oscillator.type = 'triangle';
+      var oscillator = this.audioContext.createOscillator();
+      oscillator.type = 'square';
       oscillator.frequency.value = 440;
-      oscillator.connect(audioContext.destination);
+      oscillator.connect(this.audioContext.destination);
       oscillator.start(0);
       this.oscillator = oscillator;
     }
@@ -269,7 +270,8 @@ var Chip8 = /*#__PURE__*/function () {
     key: "stopBeeping",
     value: function stopBeeping() {
       if (this.oscillator) {
-        this.oscillator.stop();
+        this.oscillator.stop(0);
+        this.oscillator.disconnect(this.audioContext.destination);
         this.oscillator = null;
       }
     }
@@ -302,6 +304,13 @@ var Chip8 = /*#__PURE__*/function () {
       }
 
       this.updateTimers();
+
+      if (this.soundTimer > 0) {
+        this.startBeeping();
+      } else {
+        this.stopBeeping();
+      }
+
       setTimeout(function () {
         _this2.cycle();
       }, 1000 / TIMER_SPEED);
@@ -314,10 +323,7 @@ var Chip8 = /*#__PURE__*/function () {
       }
 
       if (this.soundTimer > 0) {
-        this.startBeeping();
         this.soundTimer--;
-      } else {
-        this.stopBeeping();
       }
     }
   }, {
@@ -1258,8 +1264,8 @@ var Instruction = /*#__PURE__*/function () {
   }, {
     key: "execute",
     value: function execute() {
-      var name = this.getInstructionName(); // console.log('Executing instruction:', name)
-
+      var name = this.getInstructionName();
+      console.log(hex(this.code), '=', name);
       this[name]();
     }
   }]);

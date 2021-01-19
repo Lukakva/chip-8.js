@@ -798,7 +798,7 @@ export default class Instruction {
 
 	execute() {
 		const name = this.getInstructionName()
-		// console.log('Executing instruction:', name)
+		console.log(hex(this.code), '=', name)
 
 		this[name]()
 	}

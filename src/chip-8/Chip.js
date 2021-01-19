@@ -20,6 +20,8 @@ class Chip8 {
 		if (!this.canvas) {
 			throw new Error('Canvas not found:', options.canvas)
 		}
+
+		this.audioContext = new (AudioContext || webkitAudioContext)
 	}
 
 	loadFontSet() {
@@ -211,12 +213,11 @@ class Chip8 {
 			return
 		}
 
-		const audioContext = new (AudioContext || webkitAudioContext)
-		const oscillator = audioContext.createOscillator()
+		const oscillator = this.audioContext.createOscillator()
 
-		oscillator.type = 'triangle'
+		oscillator.type = 'square'
 		oscillator.frequency.value = 440
-		oscillator.connect(audioContext.destination)
+		oscillator.connect(this.audioContext.destination)
 
 		oscillator.start(0)
 		this.oscillator = oscillator
@@ -224,7 +225,8 @@ class Chip8 {
 
 	stopBeeping() {
 		if (this.oscillator) {
-			this.oscillator.stop()
+			this.oscillator.stop(0)
+			this.oscillator.disconnect(this.audioContext.destination)
 			this.oscillator = null
 		}
 	}
@@ -252,6 +254,11 @@ class Chip8 {
 		}
 
 		this.updateTimers()
+		if (this.soundTimer > 0) {
+			this.startBeeping()
+		} else {
+			this.stopBeeping()
+		}
 
 		setTimeout(() => {
 			this.cycle()
@@ -264,10 +271,7 @@ class Chip8 {
 		}
 
 		if (this.soundTimer > 0) {
-			this.startBeeping()
 			this.soundTimer--
-		} else {
-			this.stopBeeping()
 		}
 	}
 
