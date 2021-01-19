@@ -70,14 +70,11 @@ canvas {
 	box-shadow: 0 3px rgba(0, 0, 0, 0.2);
 }
 
-.button:hover {
-
-}
-
-.button:active {
+.button.active {
 	margin-top: 8px;
-	margin-bottom: 2px;
+	margin-bottom: 2px !important;
 	box-shadow: none;
+	background: rgba(0, 0, 0, 0.3);
 }
 
 #roms-wrapper {
@@ -85,6 +82,7 @@ canvas {
 	display: flex;
 	flex-direction: column;
 	align-items: center;
+	overflow: hidden;
 }
 
 #roms {
@@ -94,6 +92,8 @@ canvas {
 #instructions {
 	padding: 10px;
 	border: 1px solid rgba(0, 0, 0, 0.1);
+	margin-bottom: 10px;
+	overflow: auto;
 }
 
 </style>
@@ -102,28 +102,28 @@ canvas {
 		<canvas></canvas>
 		<div id="keyboard">
 			<div class="row">
-				<div class="button">1</div>
-				<div class="button">2</div>
-				<div class="button">3</div>
-				<div class="button">C</div>
+				<div class="button" data-value="1">1</div>
+				<div class="button" data-value="2">2</div>
+				<div class="button" data-value="3">3</div>
+				<div class="button" data-value="C">C</div>
 			</div>
 			<div class="row">
-				<div class="button">4</div>
-				<div class="button">5</div>
-				<div class="button">6</div>
-				<div class="button">D</div>
+				<div class="button" data-value="4">4</div>
+				<div class="button" data-value="5">5</div>
+				<div class="button" data-value="6">6</div>
+				<div class="button" data-value="D">D</div>
 			</div>
 			<div class="row">
-				<div class="button">7</div>
-				<div class="button">8</div>
-				<div class="button">9</div>
-				<div class="button">E</div>
+				<div class="button" data-value="7">7</div>
+				<div class="button" data-value="8">8</div>
+				<div class="button" data-value="9">9</div>
+				<div class="button" data-value="E">E</div>
 			</div>
 			<div class="row">
-				<div class="button">A</div>
-				<div class="button">0</div>
-				<div class="button">B</div>
-				<div class="button">F</div>
+				<div class="button" data-value="A">A</div>
+				<div class="button" data-value="0">0</div>
+				<div class="button" data-value="B">B</div>
+				<div class="button" data-value="F">F</div>
 			</div>
 		</div>
 		<div id="roms-wrapper">
@@ -131,7 +131,7 @@ canvas {
 				<option disabled selected>-- Select a ROM --</option>
 			</select>
 			<div id="instructions">
-				Maze, by David Winter Drawing a random maze like this one consists in drawing random diagonal lines. There are two possibilities: right-to-left line, and left-to-right line. Each line is composed of a 4*4 bitmap. As the lines must form non- circular angles, the two bitmaps won't be '/' and '\'. The first one (right line) will be a little bit modified. See at the end of this source. The maze is composed of 16 lines (as the bitmaps are 4 pixels high), each line consists of 32 bitmaps. Bitmaps are drawn in random mode. We choose a random value (0 or 1). If it is 1, we draw a left line bitmap. If it is 0, we draw a right one.
+				Select a ROM above, and instructions will appear here
 			</div>
 		</div>
 	</div>

@@ -213,6 +213,11 @@ var Chip8 = /*#__PURE__*/function () {
   }, {
     key: "onKeyDown",
     value: function onKeyDown(key) {
+      // Not initialized yet
+      if (!this.keyboard) {
+        return;
+      }
+
       console.log(key + ' was pressed'); // Since we have a hex keyboard, we can just parse the index
 
       var index = parseInt(key, 16);
@@ -232,6 +237,11 @@ var Chip8 = /*#__PURE__*/function () {
   }, {
     key: "onKeyUp",
     value: function onKeyUp(key) {
+      // Not initialized yet
+      if (!this.keyboard) {
+        return;
+      }
+
       console.log(key + ' was released'); // Since we have a hex keyboard, we can just parse the index
 
       var index = parseInt(key, 16);
@@ -1410,8 +1420,15 @@ var _loop = function _loop(i) {
   var button = buttons[i];
 
   button.onmousedown = function () {
-    lastButton = button.innerText.trim();
-    chip.onKeyDown(lastButton);
+    button.setAttribute('class', 'button active');
+    chip.onKeyDown(button.innerText.trim());
+    lastButton = button;
+  };
+
+  button.onmouseup = function () {
+    lastButton = null;
+    button.setAttribute('class', 'button');
+    chip.onKeyUp(button.innerText.trim());
   };
 };
 
@@ -1421,7 +1438,7 @@ for (var i = 0; i < buttons.length; i++) {
 
 document.onmouseup = function () {
   if (lastButton !== null) {
-    chip.onKeyUp(lastButton);
+    lastButton.onmouseup();
   }
 };
 /* Generate options for the ROM selector */
@@ -1490,6 +1507,58 @@ romsNode.onchange = function () {
 
     xhr.open('GET', txtFile);
     xhr.send();
+  } else {
+    instructionsNode.innerHTML = 'No instructions';
+  }
+};
+
+var keys = ['x', // 0
+'1', // 1
+'2', // 2
+'3', // 3
+'q', // 4
+'w', // 5
+'e', // 6
+'a', // 7
+'s', // 8
+'d', // 9
+'z', // 10
+'c', // 11
+'4', // 12
+'r', // 13
+'f', // 14
+'v' // 15
+];
+
+document.onkeydown = function (e) {
+  if (e.metaKey || e.ctrlKey || e.shiftKey) {
+    return;
+  }
+
+  var key = e.key;
+  var index = keys.indexOf(key);
+
+  if (index > -1) {
+    var value = index.toString(16).toUpperCase();
+    var button = document.querySelector("[data-value='".concat(value, "']"));
+
+    if (button) {
+      button.onmousedown();
+    }
+  }
+};
+
+document.onkeyup = function (e) {
+  var key = e.key;
+  var index = keys.indexOf(key);
+
+  if (index > -1) {
+    var value = index.toString(16).toUpperCase();
+    var button = document.querySelector("[data-value='".concat(value, "']"));
+
+    if (button) {
+      button.onmouseup();
+    }
   }
 };
 

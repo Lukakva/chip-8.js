@@ -11,14 +11,23 @@ const buttons = document.querySelectorAll('.button')
 for (let i = 0; i < buttons.length; i++) {
 	const button = buttons[i]
 	button.onmousedown = () => {
-		lastButton = button.innerText.trim()
-		chip.onKeyDown(lastButton)
+		button.setAttribute('class', 'button active')
+		chip.onKeyDown(button.innerText.trim())
+
+		lastButton = button
+	}
+
+	button.onmouseup = () => {
+		lastButton = null
+
+		button.setAttribute('class', 'button')
+		chip.onKeyUp(button.innerText.trim())
 	}
 }
 
 document.onmouseup = () => {
 	if (lastButton !== null) {
-		chip.onKeyUp(lastButton)
+		lastButton.onmouseup()
 	}
 }
 
@@ -85,6 +94,55 @@ romsNode.onchange = function() {
 		}
 		xhr.open('GET', txtFile)
 		xhr.send()
+	} else {
+		instructionsNode.innerHTML = 'No instructions'
+	}
+}
+
+const keys = [
+	'x', // 0
+	'1', // 1
+	'2', // 2
+	'3', // 3
+	'q', // 4
+	'w', // 5
+	'e', // 6
+	'a', // 7
+	's', // 8
+	'd', // 9
+	'z', // 10
+	'c', // 11
+	'4', // 12
+	'r', // 13
+	'f', // 14
+	'v', // 15
+]
+
+document.onkeydown = e => {
+	if (e.metaKey || e.ctrlKey || e.shiftKey) {
+		return
+	}
+
+	const key = e.key
+	const index = keys.indexOf(key)
+	if (index > -1) {
+		const value = index.toString(16).toUpperCase()
+		const button = document.querySelector(`[data-value='${value}']`)
+		if (button) {
+			button.onmousedown()
+		}
+	}
+}
+
+document.onkeyup = e => {
+	const key = e.key
+	const index = keys.indexOf(key)
+	if (index > -1) {
+		const value = index.toString(16).toUpperCase()
+		const button = document.querySelector(`[data-value='${value}']`)
+		if (button) {
+			button.onmouseup()
+		}
 	}
 }
 

@@ -171,6 +171,11 @@ class Chip8 {
 		(1, 2, 3, 4, ..., F)
 	*/
 	onKeyDown(key) {
+		// Not initialized yet
+		if (!this.keyboard) {
+			return
+		}
+
 		console.log(key + ' was pressed')
 		// Since we have a hex keyboard, we can just parse the index
 		const index = parseInt(key, 16)
@@ -188,6 +193,11 @@ class Chip8 {
 	}
 
 	onKeyUp(key) {
+		// Not initialized yet
+		if (!this.keyboard) {
+			return
+		}
+
 		console.log(key + ' was released')
 		// Since we have a hex keyboard, we can just parse the index
 		const index = parseInt(key, 16)
