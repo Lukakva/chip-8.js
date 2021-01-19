@@ -15,6 +15,15 @@ export default class Instruction {
 	}
 
 	/*
+		Opcode: 0NNN
+		Calls machine code routine (RCA 1802 for COSMAC VIP) at address NNN.
+		Not necessary for most ROMs.
+	*/
+	doNothing() {
+		this.chip.pc += 2
+	}
+
+	/*
 		Opcode: 00E0
 		Clears the screen (black)
 	*/
@@ -27,8 +36,8 @@ export default class Instruction {
 			}
 		}
 
-		screen.render()
 		this.chip.pc += 2
+		this.chip.screenChanged = true
 	}
 
 	/*
@@ -217,7 +226,7 @@ export default class Instruction {
 		Opcode: 8XY3
 		Sets VX to VX xor VY.
 	*/
-	bitwiseAnd() {
+	bitwiseXor() {
 		const { code, chip, chip: {registers} } = this
 
 		const X = (code & 0x0F00) >> 8
@@ -404,13 +413,15 @@ export default class Instruction {
 		const Y = (code & 0x00F0) >> 4
 		const N = (code & 0x000F)
 
-		const coordX = registers[X]
-		const coordY = registers[Y]
+		const startX = registers[X]
+		const startY = registers[Y]
 
 		// Indicate if any pixel was flipped from set to unset
 		registers[0xF] = 0
 
-		for (let y = 0; y < N; y++) {
+		// So sometimes the ROM trusts the CPU to not render anything that
+		// goes over the screen. Okay :)
+		for (let y = 0; y < N && startY + y < screen.height; y++) {
 			// A row of 8 pixels (where every bit is a pixel color)
 			const row = chip.memory[chip.registerI + y]
 
@@ -419,18 +430,18 @@ export default class Instruction {
 				const mask = 0x80 >> x
 				// If this pixel should be flipped
 				if ((row & mask) > 0) {
-					// Was this pixel a 1? It's gonna be 0 now. Set the VF register
-					if (pixels[coordY + y][coordX + x] === 1) {
+					// Was this pixel a 1? It's 0 now. Set the VF register
+					if (pixels[startY + y][startX + x]) {
 						registers[0xF] = 1
 					}
 
-					pixels[coordY + y][coordX + x] ^= 1
+					pixels[startY + y][startX + x] ^= 1
 				}
 			}
 		}
 
-		screen.render()
 		chip.pc += 2
+		chip.screenChanged = true
 	}
 
 	/*
@@ -482,25 +493,16 @@ export default class Instruction {
 		Opcode: FX0A
 		A key press is awaited, and then stored in VX.
 		(Blocking operation)
-
-		TODO: Right now, the CPU gets basically stuck on this instruction
-		over and over until a key is pressed. Is that really the way to do it?
-		Maybe it's better to actually halt the CPU and resume the process once
-		a keypress occurs?
-		(Doesn't really seem like how a real CPU would do it tho)
 	*/
 	awaitKeyPress() {
 		const { code, chip } = this
 
 		const X = (code & 0x0F00) >> 8
-		for (let i = 0; i < chip.keyboard.length; i++) {
-			// If this key is pressed, only then proceed to the next instruction
-			// Until then, this instruction will be repeated
-			if (chip.keyboard[i]) {
-				chip.registers[X] = i
-				chip.pc += 2
-				return
-			}
+		chip.halted = true
+		chip.onNextKeyDown = key => {
+			chip.registers[X] = key
+			chip.halted = false
+			chip.pc += 2
 		}
 	}
 
@@ -577,11 +579,9 @@ export default class Instruction {
 		const N = chip.registers[X]
 		const I = chip.registerI
 
-		chip.registers[I + 0] = N / 100 		// 100
-		chip.registers[I + 1] = (N % 100) / 10 	// 10
-		chip.registers[I + 2] = N % 10 			// 1
-
-		console.log('BCD', N, N / 100, (N % 100) / 10, N % 10)
+		chip.memory[I + 0] = N / 100 		// 100
+		chip.memory[I + 1] = (N % 100) / 10 // 10
+		chip.memory[I + 2] = N % 10 		// 1
 
 		chip.pc += 2
 	}
@@ -594,11 +594,11 @@ export default class Instruction {
 		(Meaning the I register is not modified)
 	*/
 	dumpRegisters() {
-		const { code, chip, chip: {registers} } = this
+		const { code, chip } = this
 
 		const X = (code & 0x0F00) >> 8
 		for (let i = 0; i <= X; i++) {
-			registers[chip.registerI + i] = registers[i]
+			chip.memory[chip.registerI + i] = chip.registers[i]
 		}
 
 		chip.pc += 2
@@ -612,11 +612,11 @@ export default class Instruction {
 		but I itself is left unmodified.
 	*/
 	loadRegisters() {
-		const { code, chip, chip: {registers} } = this
+		const { code, chip } = this
 
 		const X = (code & 0x0F00) >> 8
 		for (let i = 0; i <= X; i++) {
-			registers[i] = registers[chip.registerI + i]
+			chip.registers[i] = chip.memory[chip.registerI + i]
 		}
 
 		chip.pc += 2
@@ -624,17 +624,25 @@ export default class Instruction {
 
 	getInstructionName() {
 		const code = this.code
-		// The only 2 opcodes that can be matched exactly
-		if (code === 0x00E0) {
-			return 'clear'
-		}
-
-		if (code === 0x00EE) {
-			return 'returnFromSubroutine'
-		}
 
 		// Otherwise, opcodes depend on the first hex value (first 4 bits)
 		switch (code & 0xF000) {
+			case 0x0000: {
+				switch (code & 0x00FF) {
+					case 0xE0: {
+						return 'clear'
+					}
+
+					case 0xEE: {
+						return 'returnFromSubroutine'
+					}
+
+					default: {
+						return 'doNothing'
+					}
+				}
+			}
+
 			case 0x1000: {
 				return 'jump'
 			}
@@ -752,7 +760,7 @@ export default class Instruction {
 					}
 
 					case 0x15: {
-						return 'getDelayTimer'
+						return 'setDelayTimer'
 					}
 
 					case 0x18: {
@@ -782,7 +790,10 @@ export default class Instruction {
 			}
 		}
 
-		throw new Error('Unknown instruction: ' + hex(code))
+		throw new Error(
+			'Unknown instruction: ' + hex(code)
+			+ '. At PC ' + this.chip.pc
+		)
 	}
 
 	execute() {

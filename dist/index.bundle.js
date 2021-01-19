@@ -31,6 +31,9 @@ var STACK_SIZE = 16;
 var PROGRAM_START = 0x200;
 var SCREEN_WIDTH = 64;
 var SCREEN_HEIGHT = 32;
+var TIMER_SPEED = 60; // 60Hz
+
+var OPCODES_PER_CYCLE = 8;
 
 var Chip8 = /*#__PURE__*/function () {
   function Chip8(options) {
@@ -41,6 +44,8 @@ var Chip8 = /*#__PURE__*/function () {
     if (!this.canvas) {
       throw new Error('Canvas not found:', options.canvas);
     }
+
+    this.createBeeper();
   }
 
   _createClass(Chip8, [{
@@ -91,7 +96,8 @@ var Chip8 = /*#__PURE__*/function () {
 
       this.pc = PROGRAM_START;
       this.sp = 0;
-      this.halted = false;
+      this.halted = true;
+      this.screenChanged = false;
       /* The stack (for subroutine calls) */
 
       this.stack = new Uint16Array(STACK_SIZE);
@@ -159,6 +165,12 @@ var Chip8 = /*#__PURE__*/function () {
             return;
           }
 
+          if (xhr.status !== 200) {
+            _this.screen.renderFailure(new Error(url + ' does not exist'));
+
+            return;
+          }
+
           try {
             var rom = new Uint8Array(xhr.response);
 
@@ -209,7 +221,13 @@ var Chip8 = /*#__PURE__*/function () {
         return;
       }
 
-      this.keyboard[key] = 1;
+      this.keyboard[index] = 1;
+
+      if (this.onNextKeyDown instanceof Function) {
+        this.onNextKeyDown(index);
+        this.onNextKeyDown = null;
+        this.cycle();
+      }
     }
   }, {
     key: "onKeyUp",
@@ -224,6 +242,24 @@ var Chip8 = /*#__PURE__*/function () {
 
       this.keyboard[key] = 0;
     }
+  }, {
+    key: "createBeeper",
+    value: function createBeeper() {
+      this.audioContext = new (AudioContext || webkitAudioContext)();
+    }
+  }, {
+    key: "beep",
+    value: function beep() {
+      var audioContext = new (AudioContext || webkitAudioContext)();
+      var oscillator = audioContext.createOscillator();
+      oscillator.type = 'triangle';
+      oscillator.frequency.value = 440;
+      oscillator.connect(audioContext.destination);
+      oscillator.start(0);
+      setTimeout(function () {
+        oscillator.stop();
+      }, 60);
+    }
     /* A CPU cycle */
 
   }, {
@@ -233,24 +269,44 @@ var Chip8 = /*#__PURE__*/function () {
 
       if (this.halted) {
         return;
+      } // We need a 60Hz cycle for timers, sure, but the
+      // Processor itself can (and should) be much faster than that
+
+
+      for (var i = 0; i < OPCODES_PER_CYCLE; i++) {
+        var opcode = this.fetchOpcode();
+
+        try {
+          this.executeOpcode(opcode);
+        } catch (e) {
+          this.screen.renderFailure(e);
+          throw e;
+        }
       }
 
-      var opcode = this.fetchOpcode();
-
-      try {
-        this.executeOpcode(opcode);
-      } catch (e) {
-        this.screen.renderFailure(e);
-        throw e;
+      if (this.soundTimer > 0) {
+        this.beep();
       }
 
+      if (this.screenChanged) {
+        this.screen.render();
+      }
+
+      this.updateTimers();
+      setTimeout(function () {
+        _this2.cycle();
+      }, 1000 / TIMER_SPEED);
+    }
+  }, {
+    key: "updateTimers",
+    value: function updateTimers() {
       if (this.delayTimer > 0) {
         this.delayTimer--;
       }
 
-      setTimeout(function () {
-        _this2.cycle();
-      }, 15);
+      if (this.soundTimer > 0) {
+        this.soundTimer--;
+      }
     }
   }, {
     key: "start",
@@ -307,12 +363,23 @@ var Instruction = /*#__PURE__*/function () {
     this.chip = chip;
   }
   /*
-  	Opcode: 00E0
-  	Clears the screen (black)
+  	Opcode: 0NNN
+  	Calls machine code routine (RCA 1802 for COSMAC VIP) at address NNN.
+  	Not necessary for most ROMs.
   */
 
 
   _createClass(Instruction, [{
+    key: "doNothing",
+    value: function doNothing() {
+      this.chip.pc += 2;
+    }
+    /*
+    	Opcode: 00E0
+    	Clears the screen (black)
+    */
+
+  }, {
     key: "clear",
     value: function clear() {
       var screen = this.chip.screen;
@@ -323,8 +390,8 @@ var Instruction = /*#__PURE__*/function () {
         }
       }
 
-      screen.render();
       this.chip.pc += 2;
+      this.chip.screenChanged = true;
     }
     /*
     	Opcode: 0x00EE
@@ -532,8 +599,8 @@ var Instruction = /*#__PURE__*/function () {
     */
 
   }, {
-    key: "bitwiseAnd",
-    value: function bitwiseAnd() {
+    key: "bitwiseXor",
+    value: function bitwiseXor() {
       var code = this.code,
           chip = this.chip,
           registers = this.chip.registers;
@@ -734,12 +801,13 @@ var Instruction = /*#__PURE__*/function () {
       var X = (code & 0x0F00) >> 8;
       var Y = (code & 0x00F0) >> 4;
       var N = code & 0x000F;
-      var coordX = registers[X];
-      var coordY = registers[Y]; // Indicate if any pixel was flipped from set to unset
+      var startX = registers[X];
+      var startY = registers[Y]; // Indicate if any pixel was flipped from set to unset
 
-      registers[0xF] = 0;
+      registers[0xF] = 0; // So sometimes the ROM trusts the CPU to not render anything that
+      // goes over the screen. Okay :)
 
-      for (var y = 0; y < N; y++) {
+      for (var y = 0; y < N && startY + y < screen.height; y++) {
         // A row of 8 pixels (where every bit is a pixel color)
         var row = chip.memory[chip.registerI + y]; // Loop over each pixel value (bit by bit)
 
@@ -747,18 +815,18 @@ var Instruction = /*#__PURE__*/function () {
           var mask = 0x80 >> x; // If this pixel should be flipped
 
           if ((row & mask) > 0) {
-            // Was this pixel a 1? It's gonna be 0 now. Set the VF register
-            if (pixels[coordY + y][coordX + x] === 1) {
+            // Was this pixel a 1? It's 0 now. Set the VF register
+            if (pixels[startY + y][startX + x]) {
               registers[0xF] = 1;
             }
 
-            pixels[coordY + y][coordX + x] ^= 1;
+            pixels[startY + y][startX + x] ^= 1;
           }
         }
       }
 
-      screen.render();
       chip.pc += 2;
+      chip.screenChanged = true;
     }
     /*
     	Opcode: EX9E
@@ -816,11 +884,6 @@ var Instruction = /*#__PURE__*/function () {
     	Opcode: FX0A
     	A key press is awaited, and then stored in VX.
     	(Blocking operation)
-    		TODO: Right now, the CPU gets basically stuck on this instruction
-    	over and over until a key is pressed. Is that really the way to do it?
-    	Maybe it's better to actually halt the CPU and resume the process once
-    	a keypress occurs?
-    	(Doesn't really seem like how a real CPU would do it tho)
     */
 
   }, {
@@ -829,16 +892,13 @@ var Instruction = /*#__PURE__*/function () {
       var code = this.code,
           chip = this.chip;
       var X = (code & 0x0F00) >> 8;
+      chip.halted = true;
 
-      for (var i = 0; i < chip.keyboard.length; i++) {
-        // If this key is pressed, only then proceed to the next instruction
-        // Until then, this instruction will be repeated
-        if (chip.keyboard[i]) {
-          chip.registers[X] = i;
-          chip.pc += 2;
-          return;
-        }
-      }
+      chip.onNextKeyDown = function (key) {
+        chip.registers[X] = key;
+        chip.halted = false;
+        chip.pc += 2;
+      };
     }
     /*
     	Opcode: FX15
@@ -922,13 +982,12 @@ var Instruction = /*#__PURE__*/function () {
       var X = (code & 0x0F00) >> 8;
       var N = chip.registers[X];
       var I = chip.registerI;
-      chip.registers[I + 0] = N / 100; // 100
+      chip.memory[I + 0] = N / 100; // 100
 
-      chip.registers[I + 1] = N % 100 / 10; // 10
+      chip.memory[I + 1] = N % 100 / 10; // 10
 
-      chip.registers[I + 2] = N % 10; // 1
+      chip.memory[I + 2] = N % 10; // 1
 
-      console.log('BCD', N, N / 100, N % 100 / 10, N % 10);
       chip.pc += 2;
     }
     /*
@@ -943,12 +1002,11 @@ var Instruction = /*#__PURE__*/function () {
     key: "dumpRegisters",
     value: function dumpRegisters() {
       var code = this.code,
-          chip = this.chip,
-          registers = this.chip.registers;
+          chip = this.chip;
       var X = (code & 0x0F00) >> 8;
 
       for (var i = 0; i <= X; i++) {
-        registers[chip.registerI + i] = registers[i];
+        chip.memory[chip.registerI + i] = chip.registers[i];
       }
 
       chip.pc += 2;
@@ -965,12 +1023,11 @@ var Instruction = /*#__PURE__*/function () {
     key: "loadRegisters",
     value: function loadRegisters() {
       var code = this.code,
-          chip = this.chip,
-          registers = this.chip.registers;
+          chip = this.chip;
       var X = (code & 0x0F00) >> 8;
 
       for (var i = 0; i <= X; i++) {
-        registers[i] = registers[chip.registerI + i];
+        chip.registers[i] = chip.memory[chip.registerI + i];
       }
 
       chip.pc += 2;
@@ -978,18 +1035,29 @@ var Instruction = /*#__PURE__*/function () {
   }, {
     key: "getInstructionName",
     value: function getInstructionName() {
-      var code = this.code; // The only 2 opcodes that can be matched exactly
-
-      if (code === 0x00E0) {
-        return 'clear';
-      }
-
-      if (code === 0x00EE) {
-        return 'returnFromSubroutine';
-      } // Otherwise, opcodes depend on the first hex value (first 4 bits)
-
+      var code = this.code; // Otherwise, opcodes depend on the first hex value (first 4 bits)
 
       switch (code & 0xF000) {
+        case 0x0000:
+          {
+            switch (code & 0x00FF) {
+              case 0xE0:
+                {
+                  return 'clear';
+                }
+
+              case 0xEE:
+                {
+                  return 'returnFromSubroutine';
+                }
+
+              default:
+                {
+                  return 'doNothing';
+                }
+            }
+          }
+
         case 0x1000:
           {
             return 'jump';
@@ -1137,7 +1205,7 @@ var Instruction = /*#__PURE__*/function () {
 
               case 0x15:
                 {
-                  return 'getDelayTimer';
+                  return 'setDelayTimer';
                 }
 
               case 0x18:
@@ -1173,7 +1241,7 @@ var Instruction = /*#__PURE__*/function () {
           }
       }
 
-      throw new Error('Unknown instruction: ' + hex(code));
+      throw new Error('Unknown instruction: ' + hex(code) + '. At PC ' + this.chip.pc);
     }
   }, {
     key: "execute",
@@ -1328,24 +1396,22 @@ var Screen = /*#__PURE__*/function () {
 
 __webpack_require__.r(__webpack_exports__);
 /* harmony import */ var _chip_8_Chip__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ./chip-8/Chip */ "./src/chip-8/Chip.js");
+/* harmony import */ var _roms__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ./roms */ "./src/roms.json");
+
 
 var chip = new _chip_8_Chip__WEBPACK_IMPORTED_MODULE_0__.default({
   canvas: 'canvas',
   keyboard: '#keyboard'
 });
-chip.init();
-chip.loadRomFromFile('./chip8-roms/games/Bowling [Gooitzen van der Wal].ch8');
+var lastButton = null;
 var buttons = document.querySelectorAll('.button');
 
 var _loop = function _loop(i) {
   var button = buttons[i];
 
   button.onmousedown = function () {
-    chip.onKeyDown(button.innerText.trim());
-  };
-
-  button.onmouseup = function () {
-    chip.onKeyUp(button.innerText.trim());
+    lastButton = button.innerText.trim();
+    chip.onKeyDown(lastButton);
   };
 };
 
@@ -1353,10 +1419,91 @@ for (var i = 0; i < buttons.length; i++) {
   _loop(i);
 }
 
-setTimeout(function () {
-  return chip.start();
-}, 1000);
+document.onmouseup = function () {
+  if (lastButton !== null) {
+    chip.onKeyUp(lastButton);
+  }
+};
+/* Generate options for the ROM selector */
+
+
+var romsNode = document.querySelector('#roms');
+var instructionsNode = document.querySelector('#instructions');
+var groups = {};
+/* Generate option groups (demos, games, programs) */
+
+_roms__WEBPACK_IMPORTED_MODULE_1__.forEach(function (rom, index) {
+  var option = document.createElement('option');
+  var components = rom.bin.split('/');
+  var binary = components.pop(); // Parent folder
+
+  var group = components.pop(); // Slice off the extension
+
+  var romName = binary.slice(0, -4);
+  option.value = index;
+  option.innerHTML = romName;
+
+  if (!groups.hasOwnProperty(group)) {
+    groups[group] = [];
+  }
+
+  groups[group].push(option);
+});
+/* Append the optgroups to the Select node */
+
+var _loop2 = function _loop2(groupName) {
+  var group = groups[groupName];
+  var label = groupName[0].toUpperCase() + groupName.slice(1);
+  var optgroup = document.createElement('optgroup');
+  group.forEach(function (opt) {
+    return optgroup.appendChild(opt);
+  });
+  optgroup.setAttribute('label', label);
+  romsNode.appendChild(optgroup);
+};
+
+for (var groupName in groups) {
+  _loop2(groupName);
+}
+
+romsNode.onchange = function () {
+  chip.pause();
+  chip.init();
+  var romIndex = this.value;
+  var rom = _roms__WEBPACK_IMPORTED_MODULE_1__[romIndex];
+  var bin = rom.bin;
+  var txtFile = rom.txt ? rom.bin.slice(0, -4) + '.txt' : null;
+  chip.loadRomFromFile(bin).then(function () {
+    chip.start();
+  });
+
+  if (txtFile) {
+    var xhr = new XMLHttpRequest();
+
+    xhr.onreadystatechange = function () {
+      if (xhr.readyState !== 4) {
+        return;
+      }
+
+      instructionsNode.innerHTML = xhr.responseText || 'No instructions';
+    };
+
+    xhr.open('GET', txtFile);
+    xhr.send();
+  }
+};
+
 window._chip = chip;
+
+/***/ }),
+
+/***/ "./src/roms.json":
+/*!***********************!*\
+  !*** ./src/roms.json ***!
+  \***********************/
+/***/ ((module) => {
+
+module.exports = JSON.parse("[{\"bin\":\"chip8-roms/demos/Maze (alt) [David Winter, 199x].ch8\",\"txt\":true},{\"bin\":\"chip8-roms/demos/Maze [David Winter, 199x].ch8\",\"txt\":true},{\"bin\":\"chip8-roms/demos/Particle Demo [zeroZshadow, 2008].ch8\",\"txt\":true},{\"bin\":\"chip8-roms/demos/Sierpinski [Sergey Naydenov, 2010].ch8\",\"txt\":false},{\"bin\":\"chip8-roms/demos/Sirpinski [Sergey Naydenov, 2010].ch8\",\"txt\":false},{\"bin\":\"chip8-roms/demos/Stars [Sergey Naydenov, 2010].ch8\",\"txt\":false},{\"bin\":\"chip8-roms/demos/Trip8 Demo (2008) [Revival Studios].ch8\",\"txt\":true},{\"bin\":\"chip8-roms/demos/Zero Demo [zeroZshadow, 2007].ch8\",\"txt\":true},{\"bin\":\"chip8-roms/games/15 Puzzle [Roger Ivie] (alt).ch8\",\"txt\":false},{\"bin\":\"chip8-roms/games/15 Puzzle [Roger Ivie].ch8\",\"txt\":true},{\"bin\":\"chip8-roms/games/Addition Problems [Paul C. Moews].ch8\",\"txt\":false},{\"bin\":\"chip8-roms/games/Airplane.ch8\",\"txt\":false},{\"bin\":\"chip8-roms/games/Animal Race [Brian Astle].ch8\",\"txt\":true},{\"bin\":\"chip8-roms/games/Astro Dodge [Revival Studios, 2008].ch8\",\"txt\":true},{\"bin\":\"chip8-roms/games/Biorhythm [Jef Winsor].ch8\",\"txt\":true},{\"bin\":\"chip8-roms/games/Blinky [Hans Christian Egeberg, 1991].ch8\",\"txt\":false},{\"bin\":\"chip8-roms/games/Blinky [Hans Christian Egeberg] (alt).ch8\",\"txt\":false},{\"bin\":\"chip8-roms/games/Blitz [David Winter].ch8\",\"txt\":true},{\"bin\":\"chip8-roms/games/Bowling [Gooitzen van der Wal].ch8\",\"txt\":true},{\"bin\":\"chip8-roms/games/Breakout (Brix hack) [David Winter, 1997].ch8\",\"txt\":true},{\"bin\":\"chip8-roms/games/Breakout [Carmelo Cortez, 1979].ch8\",\"txt\":true},{\"bin\":\"chip8-roms/games/Brick (Brix hack, 1990).ch8\",\"txt\":true},{\"bin\":\"chip8-roms/games/Brix [Andreas Gustafsson, 1990].ch8\",\"txt\":false},{\"bin\":\"chip8-roms/games/Cave.ch8\",\"txt\":false},{\"bin\":\"chip8-roms/games/Coin Flipping [Carmelo Cortez, 1978].ch8\",\"txt\":true},{\"bin\":\"chip8-roms/games/Connect 4 [David Winter].ch8\",\"txt\":true},{\"bin\":\"chip8-roms/games/Craps [Camerlo Cortez, 1978].ch8\",\"txt\":true},{\"bin\":\"chip8-roms/games/Deflection [John Fort].ch8\",\"txt\":true},{\"bin\":\"chip8-roms/games/Figures.ch8\",\"txt\":false},{\"bin\":\"chip8-roms/games/Filter.ch8\",\"txt\":false},{\"bin\":\"chip8-roms/games/Guess [David Winter] (alt).ch8\",\"txt\":true},{\"bin\":\"chip8-roms/games/Guess [David Winter].ch8\",\"txt\":true},{\"bin\":\"chip8-roms/games/Hi-Lo [Jef Winsor, 1978].ch8\",\"txt\":true},{\"bin\":\"chip8-roms/games/Hidden [David Winter, 1996].ch8\",\"txt\":true},{\"bin\":\"chip8-roms/games/Kaleidoscope [Joseph Weisbecker, 1978].ch8\",\"txt\":true},{\"bin\":\"chip8-roms/games/Landing.ch8\",\"txt\":false},{\"bin\":\"chip8-roms/games/Lunar Lander (Udo Pernisz, 1979).ch8\",\"txt\":false},{\"bin\":\"chip8-roms/games/Mastermind FourRow (Robert Lindley, 1978).ch8\",\"txt\":true},{\"bin\":\"chip8-roms/games/Merlin [David Winter].ch8\",\"txt\":true},{\"bin\":\"chip8-roms/games/Missile [David Winter].ch8\",\"txt\":false},{\"bin\":\"chip8-roms/games/Most Dangerous Game [Peter Maruhnic].ch8\",\"txt\":true},{\"bin\":\"chip8-roms/games/Nim [Carmelo Cortez, 1978].ch8\",\"txt\":true},{\"bin\":\"chip8-roms/games/Paddles.ch8\",\"txt\":false},{\"bin\":\"chip8-roms/games/Pong (1 player).ch8\",\"txt\":false},{\"bin\":\"chip8-roms/games/Pong (alt).ch8\",\"txt\":false},{\"bin\":\"chip8-roms/games/Pong 2 (Pong hack) [David Winter, 1997].ch8\",\"txt\":false},{\"bin\":\"chip8-roms/games/Pong [Paul Vervalin, 1990].ch8\",\"txt\":true},{\"bin\":\"chip8-roms/games/Programmable Spacefighters [Jef Winsor].ch8\",\"txt\":true},{\"bin\":\"chip8-roms/games/Puzzle.ch8\",\"txt\":false},{\"bin\":\"chip8-roms/games/Reversi [Philip Baltzer].ch8\",\"txt\":true},{\"bin\":\"chip8-roms/games/Rocket Launch [Jonas Lindstedt].ch8\",\"txt\":false},{\"bin\":\"chip8-roms/games/Rocket Launcher.ch8\",\"txt\":false},{\"bin\":\"chip8-roms/games/Rocket [Joseph Weisbecker, 1978].ch8\",\"txt\":false},{\"bin\":\"chip8-roms/games/Rush Hour [Hap, 2006] (alt).ch8\",\"txt\":false},{\"bin\":\"chip8-roms/games/Rush Hour [Hap, 2006].ch8\",\"txt\":true},{\"bin\":\"chip8-roms/games/Russian Roulette [Carmelo Cortez, 1978].ch8\",\"txt\":true},{\"bin\":\"chip8-roms/games/Sequence Shoot [Joyce Weisbecker].ch8\",\"txt\":true},{\"bin\":\"chip8-roms/games/Shooting Stars [Philip Baltzer, 1978].ch8\",\"txt\":true},{\"bin\":\"chip8-roms/games/Slide [Joyce Weisbecker].ch8\",\"txt\":true},{\"bin\":\"chip8-roms/games/Soccer.ch8\",\"txt\":false},{\"bin\":\"chip8-roms/games/Space Flight.ch8\",\"txt\":false},{\"bin\":\"chip8-roms/games/Space Intercept [Joseph Weisbecker, 1978].ch8\",\"txt\":true},{\"bin\":\"chip8-roms/games/Space Invaders [David Winter] (alt).ch8\",\"txt\":true},{\"bin\":\"chip8-roms/games/Space Invaders [David Winter].ch8\",\"txt\":true},{\"bin\":\"chip8-roms/games/Spooky Spot [Joseph Weisbecker, 1978].ch8\",\"txt\":true},{\"bin\":\"chip8-roms/games/Squash [David Winter].ch8\",\"txt\":false},{\"bin\":\"chip8-roms/games/Submarine [Carmelo Cortez, 1978].ch8\",\"txt\":true},{\"bin\":\"chip8-roms/games/Sum Fun [Joyce Weisbecker].ch8\",\"txt\":true},{\"bin\":\"chip8-roms/games/Syzygy [Roy Trevino, 1990].ch8\",\"txt\":true},{\"bin\":\"chip8-roms/games/Tank.ch8\",\"txt\":true},{\"bin\":\"chip8-roms/games/Tapeworm [JDR, 1999].ch8\",\"txt\":false},{\"bin\":\"chip8-roms/games/Tetris [Fran Dachille, 1991].ch8\",\"txt\":true},{\"bin\":\"chip8-roms/games/Tic-Tac-Toe [David Winter].ch8\",\"txt\":false},{\"bin\":\"chip8-roms/games/Timebomb.ch8\",\"txt\":false},{\"bin\":\"chip8-roms/games/Tron.ch8\",\"txt\":false},{\"bin\":\"chip8-roms/games/UFO [Lutz V, 1992].ch8\",\"txt\":true},{\"bin\":\"chip8-roms/games/Vers [JMN, 1991].ch8\",\"txt\":false},{\"bin\":\"chip8-roms/games/Vertical Brix [Paul Robson, 1996].ch8\",\"txt\":false},{\"bin\":\"chip8-roms/games/Wall [David Winter].ch8\",\"txt\":false},{\"bin\":\"chip8-roms/games/Wipe Off [Joseph Weisbecker].ch8\",\"txt\":false},{\"bin\":\"chip8-roms/games/Worm V4 [RB-Revival Studios, 2007].ch8\",\"txt\":true},{\"bin\":\"chip8-roms/games/X-Mirror.ch8\",\"txt\":false},{\"bin\":\"chip8-roms/games/ZeroPong [zeroZshadow, 2007].ch8\",\"txt\":false},{\"bin\":\"chip8-roms/hires/Astro Dodge Hires [Revival Studios, 2008].ch8\",\"txt\":true},{\"bin\":\"chip8-roms/hires/Hires Maze [David Winter, 199x].ch8\",\"txt\":true},{\"bin\":\"chip8-roms/hires/Hires Particle Demo [zeroZshadow, 2008].ch8\",\"txt\":true},{\"bin\":\"chip8-roms/hires/Hires Sierpinski [Sergey Naydenov, 2010].ch8\",\"txt\":false},{\"bin\":\"chip8-roms/hires/Hires Stars [Sergey Naydenov, 2010].ch8\",\"txt\":false},{\"bin\":\"chip8-roms/hires/Hires Test [Tom Swan, 1979].ch8\",\"txt\":false},{\"bin\":\"chip8-roms/hires/Hires Worm V4 [RB-Revival Studios, 2007].ch8\",\"txt\":true},{\"bin\":\"chip8-roms/hires/Trip8 Hires Demo (2008) [Revival Studios].ch8\",\"txt\":true},{\"bin\":\"chip8-roms/programs/BMP Viewer - Hello (C8 example) [Hap, 2005].ch8\",\"txt\":true},{\"bin\":\"chip8-roms/programs/Chip8 Picture.ch8\",\"txt\":false},{\"bin\":\"chip8-roms/programs/Chip8 emulator Logo [Garstyciuks].ch8\",\"txt\":false},{\"bin\":\"chip8-roms/programs/Clock Program [Bill Fisher, 1981].ch8\",\"txt\":true},{\"bin\":\"chip8-roms/programs/Delay Timer Test [Matthew Mikolay, 2010].ch8\",\"txt\":true},{\"bin\":\"chip8-roms/programs/Division Test [Sergey Naydenov, 2010].ch8\",\"txt\":false},{\"bin\":\"chip8-roms/programs/Fishie [Hap, 2005].ch8\",\"txt\":true},{\"bin\":\"chip8-roms/programs/Framed MK1 [GV Samways, 1980].ch8\",\"txt\":true},{\"bin\":\"chip8-roms/programs/Framed MK2 [GV Samways, 1980].ch8\",\"txt\":true},{\"bin\":\"chip8-roms/programs/IBM Logo.ch8\",\"txt\":false},{\"bin\":\"chip8-roms/programs/Jumping X and O [Harry Kleinberg, 1977].ch8\",\"txt\":true},{\"bin\":\"chip8-roms/programs/Keypad Test [Hap, 2006].ch8\",\"txt\":true},{\"bin\":\"chip8-roms/programs/Life [GV Samways, 1980].ch8\",\"txt\":true},{\"bin\":\"chip8-roms/programs/Minimal game [Revival Studios, 2007].ch8\",\"txt\":false},{\"bin\":\"chip8-roms/programs/Random Number Test [Matthew Mikolay, 2010].ch8\",\"txt\":true},{\"bin\":\"chip8-roms/programs/SQRT Test [Sergey Naydenov, 2010].ch8\",\"txt\":false}]");
 
 /***/ })
 

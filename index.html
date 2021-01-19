@@ -2,7 +2,7 @@
 <html>
 <head>
 	<meta charset="utf-8" />
-	<title>Getting Started</title>
+	<title>Chip8 Emulator</title>
 </head>
 <style>
 
@@ -16,6 +16,8 @@ html, body {
 #wrapper {
 	display: flex;
 	max-height: 100%;
+	max-width: 600px;
+	margin: 0 auto;
 
 	flex-direction: column;
 	align-items: center;
@@ -31,13 +33,19 @@ html, body {
 
 canvas {
 	border: 1px solid black;
-	max-width: 100%;
+	margin-top: 10px;
+	width: 100%;
 }
 
 #keyboard {
 	display: flex;
 	flex-direction: column;
 	border: 1px solid rgba(0, 0, 0, 0.2);
+	margin-top: 10px;
+
+	-webkit-user-select: none;
+	-moz-user-select: none;
+	user-select: none;
 }
 
 .row {
@@ -72,6 +80,22 @@ canvas {
 	box-shadow: none;
 }
 
+#roms-wrapper {
+	width: 100%;
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+}
+
+#roms {
+	margin: 10px 0;
+}
+
+#instructions {
+	padding: 10px;
+	border: 1px solid rgba(0, 0, 0, 0.1);
+}
+
 </style>
 <body>
 	<div id="wrapper">
@@ -100,6 +124,14 @@ canvas {
 				<div class="button">0</div>
 				<div class="button">B</div>
 				<div class="button">F</div>
+			</div>
+		</div>
+		<div id="roms-wrapper">
+			<select id="roms">
+				<option disabled selected>-- Select a ROM --</option>
+			</select>
+			<div id="instructions">
+				Maze, by David Winter Drawing a random maze like this one consists in drawing random diagonal lines. There are two possibilities: right-to-left line, and left-to-right line. Each line is composed of a 4*4 bitmap. As the lines must form non- circular angles, the two bitmaps won't be '/' and '\'. The first one (right line) will be a little bit modified. See at the end of this source. The maze is composed of 16 lines (as the bitmaps are 4 pixels high), each line consists of 32 bitmaps. Bitmaps are drawn in random mode. We choose a random value (0 or 1). If it is 1, we draw a left line bitmap. If it is 0, we draw a right one.
 			</div>
 		</div>
 	</div>

@@ -11,12 +11,17 @@ const PROGRAM_START = 0x200
 const SCREEN_WIDTH = 64
 const SCREEN_HEIGHT = 32
 
+const TIMER_SPEED = 60 // 60Hz
+const OPCODES_PER_CYCLE = 8
+
 class Chip8 {
 	constructor(options) {
 		this.canvas = document.querySelector(options.canvas)
 		if (!this.canvas) {
 			throw new Error('Canvas not found:', options.canvas)
 		}
+
+		this.createBeeper()
 	}
 
 	loadFontSet() {
@@ -66,7 +71,8 @@ class Chip8 {
 		/* Program counter, stack pointer */
 		this.pc = PROGRAM_START
 		this.sp = 0
-		this.halted = false
+		this.halted = true
+		this.screenChanged = false
 
 		/* The stack (for subroutine calls) */
 		this.stack = new Uint16Array(STACK_SIZE)
@@ -123,6 +129,11 @@ class Chip8 {
 					return
 				}
 
+				if (xhr.status !== 200) {
+					this.screen.renderFailure(new Error(url + ' does not exist'))
+					return
+				}
+
 				try {
 					const rom = new Uint8Array(xhr.response)
 					this.loadRom(rom)
@@ -167,7 +178,13 @@ class Chip8 {
 			return
 		}
 
-		this.keyboard[key] = 1
+		this.keyboard[index] = 1
+		if (this.onNextKeyDown instanceof Function) {
+			this.onNextKeyDown(index)
+			this.onNextKeyDown = null
+
+			this.cycle()
+		}
 	}
 
 	onKeyUp(key) {
@@ -181,27 +198,65 @@ class Chip8 {
 		this.keyboard[key] = 0
 	}
 
+	createBeeper() {
+		this.audioContext = new (AudioContext || webkitAudioContext)
+	}
+
+	beep() {
+		const audioContext = new (AudioContext || webkitAudioContext)
+		const oscillator = audioContext.createOscillator()
+
+		oscillator.type = 'triangle'
+		oscillator.frequency.value = 440
+		oscillator.connect(audioContext.destination)
+
+		oscillator.start(0)
+		setTimeout(() => {
+			oscillator.stop()
+		}, 60)
+	}
+
 	/* A CPU cycle */
 	cycle() {
 		if (this.halted) {
 			return
 		}
 
-		const opcode = this.fetchOpcode()
-		try {
-			this.executeOpcode(opcode)
-		} catch (e) {
-			this.screen.renderFailure(e)
-			throw e
+		// We need a 60Hz cycle for timers, sure, but the
+		// Processor itself can (and should) be much faster than that
+		for (let i = 0; i < OPCODES_PER_CYCLE; i++) {
+			const opcode = this.fetchOpcode()
+			try {
+				this.executeOpcode(opcode)
+			} catch (e) {
+				this.screen.renderFailure(e)
+				throw e
+			}
 		}
 
+		if (this.soundTimer > 0) {
+			this.beep()
+		}
+
+		if (this.screenChanged) {
+			this.screen.render()
+		}
+
+		this.updateTimers()
+
+		setTimeout(() => {
+			this.cycle()
+		}, 1000 / TIMER_SPEED)
+	}
+
+	updateTimers() {
 		if (this.delayTimer > 0) {
 			this.delayTimer--
 		}
 
-		setTimeout(() => {
-			this.cycle()
-		}, 15)
+		if (this.soundTimer > 0) {
+			this.soundTimer--
+		}
 	}
 
 	start() {
