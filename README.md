@@ -13,6 +13,8 @@ Yet another Chip-8 Virtual Machine! Supports all 35 opcodes.
 | Timers | 2 internal 60Hz timers
 | Screen | 64x32 @ 60FPS
 
+This codebase tries to make a good use of Uint8Array and Uint16Array classes in JavaScript. Tries.
+
 # Keyboard
 
 The webpage comes with a UI hex keyboard like so:
