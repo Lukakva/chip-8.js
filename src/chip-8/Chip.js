@@ -20,8 +20,6 @@ class Chip8 {
 		if (!this.canvas) {
 			throw new Error('Canvas not found:', options.canvas)
 		}
-
-		this.createBeeper()
 	}
 
 	loadFontSet() {
@@ -208,11 +206,11 @@ class Chip8 {
 		this.keyboard[key] = 0
 	}
 
-	createBeeper() {
-		this.audioContext = new (AudioContext || webkitAudioContext)
-	}
+	startBeeping() {
+		if (this.oscillator) {
+			return
+		}
 
-	beep() {
 		const audioContext = new (AudioContext || webkitAudioContext)
 		const oscillator = audioContext.createOscillator()
 
@@ -221,9 +219,14 @@ class Chip8 {
 		oscillator.connect(audioContext.destination)
 
 		oscillator.start(0)
-		setTimeout(() => {
-			oscillator.stop()
-		}, 60)
+		this.oscillator = oscillator
+	}
+
+	stopBeeping() {
+		if (this.oscillator) {
+			this.oscillator.stop()
+			this.oscillator = null
+		}
 	}
 
 	/* A CPU cycle */
@@ -244,10 +247,6 @@ class Chip8 {
 			}
 		}
 
-		if (this.soundTimer > 0) {
-			this.beep()
-		}
-
 		if (this.screenChanged) {
 			this.screen.render()
 		}
@@ -265,7 +264,10 @@ class Chip8 {
 		}
 
 		if (this.soundTimer > 0) {
+			this.startBeeping()
 			this.soundTimer--
+		} else {
+			this.stopBeeping()
 		}
 	}
 

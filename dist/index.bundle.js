@@ -44,8 +44,6 @@ var Chip8 = /*#__PURE__*/function () {
     if (!this.canvas) {
       throw new Error('Canvas not found:', options.canvas);
     }
-
-    this.createBeeper();
   }
 
   _createClass(Chip8, [{
@@ -253,22 +251,27 @@ var Chip8 = /*#__PURE__*/function () {
       this.keyboard[key] = 0;
     }
   }, {
-    key: "createBeeper",
-    value: function createBeeper() {
-      this.audioContext = new (AudioContext || webkitAudioContext)();
-    }
-  }, {
-    key: "beep",
-    value: function beep() {
+    key: "startBeeping",
+    value: function startBeeping() {
+      if (this.oscillator) {
+        return;
+      }
+
       var audioContext = new (AudioContext || webkitAudioContext)();
       var oscillator = audioContext.createOscillator();
       oscillator.type = 'triangle';
       oscillator.frequency.value = 440;
       oscillator.connect(audioContext.destination);
       oscillator.start(0);
-      setTimeout(function () {
-        oscillator.stop();
-      }, 60);
+      this.oscillator = oscillator;
+    }
+  }, {
+    key: "stopBeeping",
+    value: function stopBeeping() {
+      if (this.oscillator) {
+        this.oscillator.stop();
+        this.oscillator = null;
+      }
     }
     /* A CPU cycle */
 
@@ -294,10 +297,6 @@ var Chip8 = /*#__PURE__*/function () {
         }
       }
 
-      if (this.soundTimer > 0) {
-        this.beep();
-      }
-
       if (this.screenChanged) {
         this.screen.render();
       }
@@ -315,7 +314,10 @@ var Chip8 = /*#__PURE__*/function () {
       }
 
       if (this.soundTimer > 0) {
+        this.startBeeping();
         this.soundTimer--;
+      } else {
+        this.stopBeeping();
       }
     }
   }, {
@@ -1256,8 +1258,8 @@ var Instruction = /*#__PURE__*/function () {
   }, {
     key: "execute",
     value: function execute() {
-      var name = this.getInstructionName();
-      console.log('Executing instruction:', name);
+      var name = this.getInstructionName(); // console.log('Executing instruction:', name)
+
       this[name]();
     }
   }]);
