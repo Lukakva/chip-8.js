@@ -15,13 +15,36 @@ export default class Screen {
 		this.canvas = canvas
 		this.canvas.width = width * RESOLUTION
 		this.canvas.height = height * RESOLUTION
-		// this.canvas.style.imageRendering = 'pixelated'
+		this.canvas.style.imageRendering = 'pixelated'
 
 		this.ctx = canvas.getContext('2d')
 
-		this.pixels = new Array(height)
-		for (let i = 0; i < height; i++) {
-			this.pixels[i] = new Uint8Array(width)
+		// 1 dimensional Uint8Array, instead of a matrix
+		this.pixels = new Uint8Array(height * width)
+		this.clear()
+	}
+
+	/*
+		Retrieves the value of a pixel at X, Y
+	*/
+	get(x, y) {
+		const index = y * this.width + x
+		return !!this.pixels[index]
+	}
+
+	/*
+		Toggles the value of a pixel at X, Y
+	*/
+	toggle(x, y) {
+		const index = y * this.width + x
+		if (index < this.pixels.length) {
+			this.pixels[index] ^= 1
+		}
+	}
+
+	clear() {
+		for (let i = 0; i < this.pixels.length; i++) {
+			this.pixels[i] = 0
 		}
 	}
 
@@ -97,7 +120,7 @@ export default class Screen {
 		for (let y = 0; y < this.height; y++) {
 			for (let x = 0; x < this.width; x++) {
 				// Draw a white pixel where necessary
-				if (this.pixels[y][x] == 1) {
+				if (this.get(x, y)) {
 					this.renderPixel(x, y)
 				}
 			}

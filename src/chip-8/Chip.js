@@ -12,7 +12,7 @@ const SCREEN_WIDTH = 64
 const SCREEN_HEIGHT = 32
 
 const TIMER_SPEED = 60 // 60Hz
-const OPCODES_PER_CYCLE = 8
+const OPCODES_PER_CYCLE = 10
 
 class Chip8 {
 	constructor(options) {
@@ -56,14 +56,14 @@ class Chip8 {
 			Initialize the RAM, registers, stack
 			(in order of the Wikipedia article)
 		*/
-		this.memory = new Uint16Array(RAM_SIZE)
+		this.memory = new Uint8Array(RAM_SIZE)
 		this.loadFontSet()
 
 		/*
 			15 general purpose 8-bit registers (V0-VE)
 			+ 1 carry flag register (VF)
 		*/
-		this.registers = new Uint16Array(N_REGISTERS)
+		this.registers = new Uint8Array(N_REGISTERS)
 
 		/* 16 bit address register (I) */
 		this.registerI = 0
@@ -251,6 +251,7 @@ class Chip8 {
 
 		if (this.screenChanged) {
 			this.screen.render()
+			this.screenChanged = false
 		}
 
 		this.updateTimers()

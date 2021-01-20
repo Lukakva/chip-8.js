@@ -6,7 +6,14 @@
 	(like callSubroutine, returnFromSubroutine)
 */
 
-const hex = n => '0x' + n.toString(16).toUpperCase()
+const hex = n => {
+	let str = n.toString(16).toUpperCase()
+	while (str.length < 4) {
+		str = '0' + str
+	}
+
+	return '0x' + str
+}
 
 export default class Instruction {
 	constructor(code, chip) {
@@ -30,11 +37,7 @@ export default class Instruction {
 	clear() {
 		const { screen } = this.chip
 
-		for (let y = 0; y < screen.height; y++) {
-			for (let x = 0; x < screen.width; x++) {
-				screen.pixels[y][x] = 0
-			}
-		}
+		screen.clear()
 
 		this.chip.pc += 2
 		this.chip.screenChanged = true
@@ -174,8 +177,6 @@ export default class Instruction {
 		const NN = code & 0x00FF
 
 		chip.registers[X] += NN
-		// Limit to 255 (Mimic a 8bit behavior)
-		chip.registers[X] &= 0xFF
 
 		chip.pc += 2
 	}
@@ -252,12 +253,11 @@ export default class Instruction {
 			If the result is larger than a 8 bit integer (255), we have a carry
 		*/
 		const result = registers[X] + registers[Y]
-		const carry = result > 0xFF
 
 		// Store the carry in VF Register
-		registers[0xF] = carry
+		registers[0xF] = result > 0xFF
 		// Limit the resulting sum by 255
-		registers[X] = result & 0xFF
+		registers[X] = result
 
 		chip.pc += 2
 	}
@@ -407,7 +407,6 @@ export default class Instruction {
 		*/
 		const { code, chip } = this
 		const { registers, screen } = chip
-		const pixels = screen.pixels
 
 		const X = (code & 0x0F00) >> 8
 		const Y = (code & 0x00F0) >> 4
@@ -416,7 +415,7 @@ export default class Instruction {
 		const startX = registers[X]
 		const startY = registers[Y]
 
-		// Indicate if any pixel was flipped from set to unset
+		// Indicate if any pixel was flipped from set to unset (collision)
 		registers[0xF] = 0
 
 		// So sometimes the ROM trusts the CPU to not render anything that
@@ -430,12 +429,15 @@ export default class Instruction {
 				const mask = 0x80 >> x
 				// If this pixel should be flipped
 				if ((row & mask) > 0) {
+					const pixelX = startX + x
+					const pixelY = startY + y
+
 					// Was this pixel a 1? It's 0 now. Set the VF register
-					if (pixels[startY + y][startX + x]) {
+					if (screen.get(pixelX, pixelY)) {
 						registers[0xF] = 1
 					}
 
-					pixels[startY + y][startX + x] ^= 1
+					screen.toggle(pixelX, pixelY)
 				}
 			}
 		}
@@ -461,7 +463,7 @@ export default class Instruction {
 	}
 
 	/*
-		Opcode: EX9E
+		Opcode: EXA1
 		Skips the next instruction if the key stored in VX isn't pressed.
 	*/
 	skipIfKeyNotPressed() {
@@ -629,47 +631,20 @@ export default class Instruction {
 		switch (code & 0xF000) {
 			case 0x0000: {
 				switch (code & 0x00FF) {
-					case 0xE0: {
-						return 'clear'
-					}
+					case 0xE0: return 'clear'
+					case 0xEE: return 'returnFromSubroutine'
 
-					case 0xEE: {
-						return 'returnFromSubroutine'
-					}
-
-					default: {
-						return 'doNothing'
-					}
+					default:   return 'doNothing'
 				}
 			}
 
-			case 0x1000: {
-				return 'jump'
-			}
-
-			case 0x2000: {
-				return 'callSubroutine'
-			}
-
-			case 0x3000: {
-				return 'skipIfRegisterEquals'
-			}
-
-			case 0x4000: {
-				return 'skipIfRegisterNotEquals'
-			}
-
-			case 0x5000: {
-				return 'skipIfRegistersEqual'
-			}
-
-			case 0x6000: {
-				return 'setRegisterValue'
-			}
-
-			case 0x7000: {
-				return 'addToRegisterValue'
-			}
+			case 0x1000: return 'jump'
+			case 0x2000: return 'callSubroutine'
+			case 0x3000: return 'skipIfRegisterEquals'
+			case 0x4000: return 'skipIfRegisterNotEquals'
+			case 0x5000: return 'skipIfRegistersEqual'
+			case 0x6000: return 'setRegisterValue'
+			case 0x7000: return 'addToRegisterValue'
 
 			/*
 				There are a few opcodes beginning with 8, which can be
@@ -678,114 +653,43 @@ export default class Instruction {
 			case 0x8000: {
 				// The last 4 bits
 				switch (code & 0x000F) {
-					case 0x0: {
-						return 'assign'
-					}
-
-					case 0x1: {
-						return 'bitwiseOr'
-					}
-
-					case 0x2: {
-						return 'bitwiseAnd'
-					}
-
-					case 0x3: {
-						return 'bitwiseXor'
-					}
-
-					case 0x4: {
-						return 'add'
-					}
-
-					case 0x5: {
-						return 'subtract'
-					}
-
-					case 0x6: {
-						return 'shiftRight'
-					}
-
-					case 0x7: {
-						return 'subtractRegisters'
-					}
-
-					case 0xE: {
-						return 'shiftLeft'
-					}
+					case 0x0: return 'assign'
+					case 0x1: return 'bitwiseOr'
+					case 0x2: return 'bitwiseAnd'
+					case 0x3: return 'bitwiseXor'
+					case 0x4: return 'add'
+					case 0x5: return 'subtract'
+					case 0x6: return 'shiftRight'
+					case 0x7: return 'subtractRegisters'
+					case 0xE: return 'shiftLeft'
 				}
 			}
 
-			case 0x9000: {
-				return 'skipIfRegistersNotEqual'
-			}
-
-			case 0xA000: {
-				return 'setMemoryRegister'
-			}
-
-			case 0xB000: {
-				return 'jumpV0'
-			}
-
-			case 0xC000: {
-				return 'rand'
-			}
-
-			case 0xD000: {
-				return 'draw'
-			}
+			case 0x9000: return 'skipIfRegistersNotEqual'
+			case 0xA000: return 'setMemoryRegister'
+			case 0xB000: return 'jumpV0'
+			case 0xC000: return 'rand'
+			case 0xD000: return 'draw'
 
 			case 0xE000: {
 				switch (code & 0x00FF) {
-					case 0x9E: {
-						return 'skipIfKeyPressed'
-					}
-
-					case 0xA1: {
-						return 'skipIfKeyNotPressed'
-					}
+					case 0x9E: return 'skipIfKeyPressed'
+					case 0xA1: return 'skipIfKeyNotPressed'
 				}
 			}
 
 			case 0xF000: {
 				// For F opcodes, the last 2 bits are the identifiers
 				switch (code & 0x00FF) {
-					case 0x07: {
-						return 'getDelayTimer'
-					}
-
-					case 0x0A: {
-						return 'awaitKeyPress'
-					}
-
-					case 0x15: {
-						return 'setDelayTimer'
-					}
-
-					case 0x18: {
-						return 'setSoundTimer'
-					}
-
-					case 0x1E: {
-						return 'addMem'
-					}
-
-					case 0x29: {
-						return 'setCharacterInMemory'
-					}
-
-					case 0x33: {
-						return 'storeBCD'
-					}
-
-					case 0x55: {
-						return 'dumpRegisters'
-					}
-
-					case 0x65: {
-						return 'loadRegisters'
-					}
+					case 0x07: return 'getDelayTimer'
+					case 0x0A: return 'awaitKeyPress'
+					case 0x15: return 'setDelayTimer'
+					case 0x18: return 'setSoundTimer'
+					case 0x1E: return 'addMem'
+					case 0x29: return 'setCharacterInMemory'
+					case 0x33: return 'storeBCD'
+					case 0x55: return 'dumpRegisters'
+					case 0x65: return 'loadRegisters'
 				}
 			}
 		}
@@ -798,7 +702,7 @@ export default class Instruction {
 
 	execute() {
 		const name = this.getInstructionName()
-		console.log(hex(this.code), '=', name)
+		// console.log(hex(this.code), '=', name)
 
 		this[name]()
 	}

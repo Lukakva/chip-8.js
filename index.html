@@ -13,13 +13,10 @@ html, body {
 	width: 100%;
 }
 
-#wrapper {
+#emulator-wrapper {
 	display: flex;
-	max-height: 100%;
-	max-width: 600px;
-	margin: 0 auto;
-
-	flex-direction: column;
+	width: 100%;
+	flex-direction: row;
 	align-items: center;
 	justify-content: center;
 
@@ -32,16 +29,18 @@ html, body {
 }
 
 canvas {
-	border: 1px solid black;
+	border: 4px double black;
+	border-radius: 10px;
+	overflow: hidden;
 	margin-top: 10px;
-	width: 100%;
+	width: 600px;
 }
 
 #keyboard {
 	display: flex;
 	flex-direction: column;
 	border: 1px solid rgba(0, 0, 0, 0.2);
-	margin-top: 10px;
+	margin-left: 10px;
 
 	-webkit-user-select: none;
 	-moz-user-select: none;
@@ -83,10 +82,13 @@ canvas {
 	flex-direction: column;
 	align-items: center;
 	overflow: hidden;
+
+	margin-left: -106px;
 }
 
 #roms {
 	margin: 10px 0;
+	width: 600px;
 }
 
 #instructions {
@@ -94,11 +96,14 @@ canvas {
 	border: 1px solid rgba(0, 0, 0, 0.1);
 	margin-bottom: 10px;
 	overflow: auto;
+	width: 600px;
+
+	white-space: pre;
 }
 
 </style>
 <body>
-	<div id="wrapper">
+	<div id="emulator-wrapper">
 		<canvas></canvas>
 		<div id="keyboard">
 			<div class="row">
@@ -126,14 +131,12 @@ canvas {
 				<div class="button" data-value="F">F</div>
 			</div>
 		</div>
-		<div id="roms-wrapper">
-			<select id="roms">
-				<option disabled selected>-- Select a ROM --</option>
-			</select>
-			<div id="instructions">
-				Select a ROM above, and instructions will appear here
-			</div>
-		</div>
+	</div>
+	<div id="roms-wrapper">
+		<select id="roms">
+			<option disabled selected>-- Select a ROM --</option>
+		</select>
+		<div id="instructions">Select a ROM above, and instructions will appear here</div>
 	</div>
 </body>
 <script src="./dist/index.bundle.js"></script>
