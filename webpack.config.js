@@ -1,7 +1,7 @@
 const path = require('path');
 
 module.exports = {
-    mode: 'development',
+    mode: 'production',
     devtool: false,
     watch: true,
     entry: {

@@ -76,11 +76,27 @@ romsNode.onchange = function() {
 	const romIndex = this.value
 	const rom = ROMs[romIndex]
 
-	chip.loadRomFromFile(rom.bin).then(() => {
+	const bin = rom.bin
+	const txtFile = rom.txt ? rom.bin.slice(0, -4) + '.txt' : null
+
+	chip.loadRomFromFile(bin).then(() => {
 		chip.start()
 	})
 
-	instructionsNode.innerHTML = rom.txt
+	if (txtFile) {
+		const xhr = new XMLHttpRequest()
+		xhr.onreadystatechange = () => {
+			if (xhr.readyState !== 4) {
+				return
+			}
+
+			instructionsNode.innerHTML = xhr.responseText || 'No instructions'
+		}
+		xhr.open('GET', txtFile)
+		xhr.send()
+	} else {
+		instructionsNode.innerHTML = 'No instructions'
+	}
 }
 
 const keys = [
