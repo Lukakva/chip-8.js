@@ -69,12 +69,20 @@ export default class Decompiler {
 				}
 
 				case 'add': {
-					line += `register${args[0]} += register${args[1]}; // With carry in VF`
+					const lineCopy = line
+					line += `register15 = (register${args[0]} + register${args[1]}) > 255 // VF carry flag\n`
+					line += lineCopy
+					line += `register${args[0]} += register${args[1]} // Overflows at 255`
+
 					break
 				}
 
 				case 'subtract': {
-					line += `register${args[0]} -= register${args[1]}; // With not brrow in VF`
+					const lineCopy = line
+					line += `register15 = register${args[0]} >= register${args[1]} // VF no borrow flag basically does means this\n`
+					line += lineCopy
+					line += `register${args[0]} -= register${args[1]}`
+
 					break
 				}
 
@@ -84,14 +92,21 @@ export default class Decompiler {
 				}
 
 				case 'skipIfRegisterEquals': {
-					line += `if (register${args[0]} != ${args[1]}) {`
+					line += `if (register${args[0]} != ${args[1]})`
 
 					scopeOpened = true
 					break
 				}
 
 				case 'skipIfRegisterNotEquals': {
-					line += `if (register${args[0]} == ${args[1]}) {`
+					line += `if (register${args[0]} == ${args[1]})`
+
+					scopeOpened = true
+					break
+				}
+
+				case 'skipIfKeyNotPressed': {
+					line += `if (key_pressed(register${args[0]}))`
 
 					scopeOpened = true
 					break
