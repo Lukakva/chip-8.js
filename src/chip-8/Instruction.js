@@ -6,14 +6,7 @@
 	(like callSubroutine, returnFromSubroutine)
 */
 
-const hex = n => {
-	let str = n.toString(16).toUpperCase()
-	while (str.length < 4) {
-		str = '0' + str
-	}
-
-	return '0x' + str
-}
+import { hex } from './Shared'
 
 export default class Instruction {
 	constructor(code, chip) {
@@ -68,8 +61,7 @@ export default class Instruction {
 		Opcode: 1NNN
 		Jumps to address NNN
 	*/
-	jump() {
-		const NNN = this.code & 0x0FFF
+	jump(NNN) {
 		if (this.chip.pc === NNN) {
 			this.chip.halted = true
 			return
@@ -83,19 +75,18 @@ export default class Instruction {
 		Opcode: 2NNN
 		Executes the subroutine at NNN
 	*/
-	callSubroutine() {
-		const nnn = this.code & 0x0FFF
+	callSubroutine(NNN) {
 		const chip = this.chip
 
 		if (chip.sp >= chip.stack.length) {
 			throw new Error(
-				'Could not enter a subroutine at ' + hex(nnn)
+				'Could not enter a subroutine at ' + hex(NNN)
 				+ 'from PC ' + hex(chip.pc) + 'because the stack is full.'
 			)
 		}
 
 		chip.stack[chip.sp++] = chip.pc
-		chip.pc = nnn
+		chip.pc = NNN
 	}
 
 	/*
@@ -103,11 +94,8 @@ export default class Instruction {
 		Skips the next instruction if the value stored in the register X
 		is equal to the constant NN
 	*/
-	skipIfRegisterEquals() {
-		const { code, chip, chip: {registers} } = this
-
-		const X = (code & 0x0F00) >> 8
-		const NN = code & 0x00FF
+	skipIfRegisterEquals(X, NN) {
+		const { chip, chip: {registers} } = this
 
 		if (registers[X] === NN) {
 			chip.pc += 4
@@ -121,11 +109,8 @@ export default class Instruction {
 		Skips the next instruction if the value stored in the register X
 		IS NOT equal to the constant NN
 	*/
-	skipIfRegisterNotEquals() {
-		const { code, chip, chip: {registers} } = this
-
-		const X = (code & 0x0F00) >> 8
-		const NN = code & 0x00FF
+	skipIfRegisterNotEquals(X, NN) {
+		const { chip, chip: {registers} } = this
 
 		if (registers[X] !== NN) {
 			chip.pc += 4
@@ -139,11 +124,8 @@ export default class Instruction {
 		Skips the next instruction if the values stored in registers X and Y
 		are equal to each other
 	*/
-	skipIfRegistersEqual() {
-		const { code, chip, chip: {registers} } = this
-
-		const X = (code & 0x0F00) >> 8
-		const Y = (code & 0x00F0) >> 4
+	skipIfRegistersEqual(X, Y) {
+		const { chip, chip: {registers} } = this
 
 		if (registers[X] === registers[Y]) {
 			chip.pc += 4
@@ -156,11 +138,8 @@ export default class Instruction {
 		Opcode: 6XNN
 		Sets VX to NN.
 	*/
-	setRegisterValue() {
+	setRegisterValue(X, NN) {
 		const { chip, code } = this
-
-		const X = (code & 0x0F00) >> 8
-		const NN = code & 0x00FF
 
 		chip.registers[X] = NN
 		chip.pc += 2
@@ -170,11 +149,8 @@ export default class Instruction {
 		Opcode: 7XNN
 		Adds NN to VX. (Carry flag is not changed)
 	*/
-	addToRegisterValue() {
+	addToRegisterValue(X, NN) {
 		const { chip, code} = this
-
-		const X = (code & 0x0F00) >> 8
-		const NN = code & 0x00FF
 
 		chip.registers[X] += NN
 
@@ -185,11 +161,8 @@ export default class Instruction {
 		Opcode: 8XY0
 		Assignment - Sets VX to the value of VY.
 	*/
-	assign() {
-		const { code, chip, chip: {registers} } = this
-
-		const X = (code & 0x0F00) >> 8
-		const Y = (code & 0x00F0) >> 4
+	assign(X, Y) {
+		const { chip, chip: {registers} } = this
 
 		registers[X] = registers[Y]
 		chip.pc += 2
@@ -199,11 +172,8 @@ export default class Instruction {
 		Opcode: 8XY1
 		Sets VX to VX or VY. (Bitwise OR operation)
 	*/
-	bitwiseOr() {
-		const { code, chip, chip: {registers} } = this
-
-		const X = (code & 0x0F00) >> 8
-		const Y = (code & 0x00F0) >> 4
+	bitwiseOr(X, Y) {
+		const { chip, chip: {registers} } = this
 
 		registers[X] = registers[X] | registers[Y]
 		chip.pc += 2
@@ -213,11 +183,8 @@ export default class Instruction {
 		Opcode: 8XY2
 		Sets VX to VX and VY. (Bitwise AND operation)
 	*/
-	bitwiseAnd() {
-		const { code, chip, chip: {registers} } = this
-
-		const X = (code & 0x0F00) >> 8
-		const Y = (code & 0x00F0) >> 4
+	bitwiseAnd(X, Y) {
+		const { chip, chip: {registers} } = this
 
 		registers[X] = registers[X] & registers[Y]
 		chip.pc += 2
@@ -227,11 +194,8 @@ export default class Instruction {
 		Opcode: 8XY3
 		Sets VX to VX xor VY.
 	*/
-	bitwiseXor() {
-		const { code, chip, chip: {registers} } = this
-
-		const X = (code & 0x0F00) >> 8
-		const Y = (code & 0x00F0) >> 4
+	bitwiseXor(X, Y) {
+		const { chip, chip: {registers} } = this
 
 		registers[X] = registers[X] ^ registers[Y]
 		chip.pc += 2
@@ -242,11 +206,8 @@ export default class Instruction {
 		Adds VY to VX. VF is set to 1 when there's a carry,
 		and to 0 when there isn't.
 	*/
-	add() {
-		const { code, chip, chip: {registers} } = this
-
-		const X = (code & 0x0F00) >> 8
-		const Y = (code & 0x00F0) >> 4
+	add(X, Y) {
+		const { chip, chip: {registers} } = this
 
 		/*
 			Thankfully JavaScript can operate on ints larger than 8 bits :v
@@ -267,11 +228,8 @@ export default class Instruction {
 		VY is subtracted from VX. VF is set to 0 when there's a borrow,
 		and 1 when there isn't.
 	*/
-	subtract() {
-		const { code, chip, chip: {registers} } = this
-
-		const X = (code & 0x0F00) >> 8
-		const Y = (code & 0x00F0) >> 4
+	subtract(X, Y) {
+		const { chip, chip: {registers} } = this
 
 		/*
 			A borrow occurs if X < Y, but instruction requires the VF
@@ -289,11 +247,9 @@ export default class Instruction {
 		Stores the least significant bit of VX in VF
 		and then shifts VX to the right by 1.
 	*/
-	shiftRight() {
-		const { code, chip, chip: {registers} } = this
-
-		const X = (code & 0x0F00) >> 8
-		const Y = (code & 0x00F0) >> 4
+	shiftRight(X, Y) {
+		// TODO, fix. Why does this need Y argument then?
+		const { chip, chip: {registers} } = this
 
 		// Store the least significant bit
 		registers[0xF] = registers[X] & 0x1
@@ -307,11 +263,8 @@ export default class Instruction {
 		Sets VX to VY minus VX. VF is set to 0 when there's a borrow,
 		and 1 when there isn't.
 	*/
-	subtractRegisters() {
-		const { code, chip, chip: {registers} } = this
-
-		const X = (code & 0x0F00) >> 8
-		const Y = (code & 0x00F0) >> 4
+	subtractRegisters(X, Y) {
+		const { chip, chip: {registers} } = this
 
 		// Store the least significant bit
 		registers[0xF] = registers[Y] >= registers[X]
@@ -325,11 +278,8 @@ export default class Instruction {
 		Stores the most significant bit of VX in VF
 		and then shifts VX to the left by 1.
 	*/
-	shiftLeft() {
-		const { code, chip, chip: {registers} } = this
-
-		const X = (code & 0x0F00) >> 8
-		const Y = (code & 0x00F0) >> 4
+	shiftLeft(X, Y) {
+		const { chip, chip: {registers} } = this
 
 		// Get the most significant bit
 		const msb = registers[X] & (1 << 7)
@@ -345,11 +295,8 @@ export default class Instruction {
 		Opcode: 9XY0
 		Skips the next instruction if VX doesn't equal VY.
 	*/
-	skipIfRegistersNotEqual() {
-		const { code, chip, chip: {registers} } = this
-
-		const X = (code & 0x0F00) >> 8
-		const Y = (code & 0x00F0) >> 4
+	skipIfRegistersNotEqual(X, Y) {
+		const { chip, chip: {registers} } = this
 
 		if (registers[X] !== registers[Y]) {
 			// 4 instead of 2 (effectively skipping the next instruction)
@@ -363,9 +310,7 @@ export default class Instruction {
 		Opcode: ANNN
 		Sets I to the address NNN.
 	*/
-	setMemoryRegister() {
-		const NNN = this.code & 0x0FFF
-
+	setMemoryRegister(NNN) {
 		this.chip.registerI = NNN
 		this.chip.pc += 2
 	}
@@ -374,8 +319,7 @@ export default class Instruction {
 		Opcode: BNNN
 		Jumps to the address NNN plus V0.
 	*/
-	jumpV0() {
-		const NNN = this.code & 0x0FFF
+	jumpV0(NNN) {
 		this.chip.pc = this.chip.registers[0] + NNN
 	}
 
@@ -384,15 +328,11 @@ export default class Instruction {
 		Sets VX to the result of a bitwise and operation on a
 		random number (Typically: 0 to 255) and NN.
 	*/
-	rand() {
-		const { code, chip } = this
-
-		const X = (code & 0x0F00) >> 8
-		const NN = code & 0x00FF
+	rand(X, NN) {
 		const random = Math.floor(Math.random() * 0x100)
 
-		chip.registers[X] = random & NN
-		chip.pc += 2
+		this.chip.registers[X] = random & NN
+		this.chip.pc += 2
 	}
 
 	/*
@@ -400,17 +340,8 @@ export default class Instruction {
 		Draws a sprite at coordinate (VX, VY) that has a width of 8 pixels
 		and a height of N+1 pixels.
 	*/
-	draw() {
-		/*
-			Each row of 8 pixels is read as bit-coded
-			starting from memory location I
-		*/
-		const { code, chip } = this
-		const { registers, screen } = chip
-
-		const X = (code & 0x0F00) >> 8
-		const Y = (code & 0x00F0) >> 4
-		const N = (code & 0x000F)
+	draw(X, Y, N) {
+		const { chip, chip: {registers, screen} } = this
 
 		const startX = registers[X]
 		const startY = registers[Y]
@@ -450,9 +381,8 @@ export default class Instruction {
 		Opcode: EX9E
 		Skips the next instruction if the key stored in VX is pressed.
 	*/
-	skipIfKeyPressed() {
-		const { code, chip } = this
-		const X = (code & 0x0F00) >> 8
+	skipIfKeyPressed(X) {
+		const { chip } = this
 
 		const desiredKey = chip.registers[X]
 		if (chip.keyboard[desiredKey]) {
@@ -466,12 +396,10 @@ export default class Instruction {
 		Opcode: EXA1
 		Skips the next instruction if the key stored in VX isn't pressed.
 	*/
-	skipIfKeyNotPressed() {
-		const { code, chip } = this
+	skipIfKeyNotPressed(X) {
+		const { chip } = this
 
-		const X = (code & 0x0F00) >> 8
 		const desiredKey = chip.registers[X]
-
 		if (!chip.keyboard[desiredKey]) {
 			chip.pc += 4
 		} else {
@@ -483,9 +411,8 @@ export default class Instruction {
 		Opcode: FX07
 		Sets VX to the value of the delay timer.
 	*/
-	getDelayTimer() {
-		const { code, chip } = this
-		const X = (code & 0x0F00) >> 8
+	getDelayTimer(X) {
+		const { chip } = this
 
 		chip.registers[X] = chip.delayTimer
 		chip.pc += 2
@@ -496,10 +423,9 @@ export default class Instruction {
 		A key press is awaited, and then stored in VX.
 		(Blocking operation)
 	*/
-	awaitKeyPress() {
-		const { code, chip } = this
+	awaitKeyPress(X) {
+		const { chip } = this
 
-		const X = (code & 0x0F00) >> 8
 		chip.halted = true
 		chip.onNextKeyDown = key => {
 			chip.registers[X] = key
@@ -512,9 +438,8 @@ export default class Instruction {
 		Opcode: FX15
 		Sets the delay timer to VX.
 	*/
-	setDelayTimer() {
-		const { code, chip } = this
-		const X = (code & 0x0F00) >> 8
+	setDelayTimer(X) {
+		const { chip } = this
 
 		chip.delayTimer = chip.registers[X]
 		chip.pc += 2
@@ -524,9 +449,8 @@ export default class Instruction {
 		Opcode: FX18
 		Sets the sound timer to VX.
 	*/
-	setSoundTimer() {
-		const { code, chip } = this
-		const X = (code & 0x0F00) >> 8
+	setSoundTXimer() {
+		const { chip } = this
 
 		chip.soundTimer = chip.registers[X]
 		chip.pc += 2
@@ -536,10 +460,9 @@ export default class Instruction {
 		Opcode: FX1E
 		Adds VX to I. VF is not affected.
 	*/
-	addMem() {
-		const { code, chip } = this
+	addMem(X) {
+		const { chip } = this
 
-		const X = (code & 0x0F00) >> 8
 		chip.registerI += chip.registers[X]
 		// Limit to 16 bits
 		chip.registerI &= 0xFFFF
@@ -552,13 +475,12 @@ export default class Instruction {
 		Sets I to the location of the sprite for the character in VX.
 		Characters 0-F (in hexadecimal) are represented by a 4x5 font.
 	*/
-	setCharacterInMemory() {
-		const { code, chip } = this
+	setCharacterInMemory(X) {
+		const { chip } = this
 
 		// Since all characters are a 5 byte sprite
 		// We can just multiply the character index by 5
 		// to move to the correct memory location
-		const X = (code & 0x0F00) >> 8
 		chip.registerI = chip.registers[X] * 0x5
 		chip.pc += 2
 	}
@@ -574,10 +496,9 @@ export default class Instruction {
 		the tens digit at location I+1,
 		and the ones digit at location I+2.)
 	*/
-	storeBCD() {
-		const { code, chip } = this
+	storeBCD(X) {
+		const { chip } = this
 
-		const X = (code & 0x0F00) >> 8
 		const N = chip.registers[X]
 		const I = chip.registerI
 
@@ -595,10 +516,9 @@ export default class Instruction {
 		but I itself is left unmodified.
 		(Meaning the I register is not modified)
 	*/
-	dumpRegisters() {
-		const { code, chip } = this
+	dumpRegisters(X) {
+		const { chip } = this
 
-		const X = (code & 0x0F00) >> 8
 		for (let i = 0; i <= X; i++) {
 			chip.memory[chip.registerI + i] = chip.registers[i]
 		}
@@ -613,10 +533,9 @@ export default class Instruction {
 		The offset from I is increased by 1 for each value written,
 		but I itself is left unmodified.
 	*/
-	loadRegisters() {
-		const { code, chip } = this
+	loadRegisters(X) {
+		const { chip } = this
 
-		const X = (code & 0x0F00) >> 8
 		for (let i = 0; i <= X; i++) {
 			chip.registers[i] = chip.memory[chip.registerI + i]
 		}
@@ -624,72 +543,79 @@ export default class Instruction {
 		chip.pc += 2
 	}
 
-	getInstructionName() {
+	/*
+		Decodes an instruction
+		Returns an array that provides the argument names for the instruction
+		(Also useful for decompiling binaries)
+	*/
+	decode() {
 		const code = this.code
 
 		// Otherwise, opcodes depend on the first hex value (first 4 bits)
 		switch (code & 0xF000) {
 			case 0x0000: {
 				switch (code & 0x00FF) {
-					case 0xE0: return 'clear'
-					case 0xEE: return 'returnFromSubroutine'
+					case 0xE0: return ['clear']
+					case 0xEE: return ['returnFromSubroutine']
 
-					default:   return 'doNothing'
+					default:   return ['doNothing']
 				}
 			}
 
-			case 0x1000: return 'jump'
-			case 0x2000: return 'callSubroutine'
-			case 0x3000: return 'skipIfRegisterEquals'
-			case 0x4000: return 'skipIfRegisterNotEquals'
-			case 0x5000: return 'skipIfRegistersEqual'
-			case 0x6000: return 'setRegisterValue'
-			case 0x7000: return 'addToRegisterValue'
+			case 0x1000: return ['jump',                    'NNN']
+			case 0x2000: return ['callSubroutine',          'NNN']
+			case 0x3000: return ['skipIfRegisterEquals',    'X', 'NN']
+			case 0x4000: return ['skipIfRegisterNotEquals', 'X', 'NN']
+			case 0x5000: return ['skipIfRegistersEqual',    'X', 'Y']
+			case 0x6000: return ['setRegisterValue',        'X', 'NN']
+			case 0x7000: return ['addToRegisterValue',      'X', 'NN']
 
 			/*
 				There are a few opcodes beginning with 8, which can be
 				distinguished by the last 4 bits
+
+				All of them take X, Y registers as arguments
 			*/
 			case 0x8000: {
 				// The last 4 bits
 				switch (code & 0x000F) {
-					case 0x0: return 'assign'
-					case 0x1: return 'bitwiseOr'
-					case 0x2: return 'bitwiseAnd'
-					case 0x3: return 'bitwiseXor'
-					case 0x4: return 'add'
-					case 0x5: return 'subtract'
-					case 0x6: return 'shiftRight'
-					case 0x7: return 'subtractRegisters'
-					case 0xE: return 'shiftLeft'
+					case 0x0: return ['assign',            'X', 'Y']
+					case 0x1: return ['bitwiseOr',         'X', 'Y']
+					case 0x2: return ['bitwiseAnd',        'X', 'Y']
+					case 0x3: return ['bitwiseXor',        'X', 'Y']
+					case 0x4: return ['add',               'X', 'Y']
+					case 0x5: return ['subtract',          'X', 'Y']
+					case 0x6: return ['shiftRight',        'X', 'Y']
+					case 0x7: return ['subtractRegisters', 'X', 'Y']
+					case 0xE: return ['shiftLeft',         'X', 'Y']
 				}
 			}
 
-			case 0x9000: return 'skipIfRegistersNotEqual'
-			case 0xA000: return 'setMemoryRegister'
-			case 0xB000: return 'jumpV0'
-			case 0xC000: return 'rand'
-			case 0xD000: return 'draw'
+			case 0x9000: return ['skipIfRegistersNotEqual', 'X', 'Y']
+			case 0xA000: return ['setMemoryRegister', 'NNN']
+			case 0xB000: return ['jumpV0', 'NNN']
+			case 0xC000: return ['rand', 'X', 'NN']
+			case 0xD000: return ['draw', 'X', 'Y', 'N']
 
 			case 0xE000: {
 				switch (code & 0x00FF) {
-					case 0x9E: return 'skipIfKeyPressed'
-					case 0xA1: return 'skipIfKeyNotPressed'
+					case 0x9E: return ['skipIfKeyPressed', 'X']
+					case 0xA1: return ['skipIfKeyNotPressed', 'X']
 				}
 			}
 
 			case 0xF000: {
 				// For F opcodes, the last 2 bits are the identifiers
 				switch (code & 0x00FF) {
-					case 0x07: return 'getDelayTimer'
-					case 0x0A: return 'awaitKeyPress'
-					case 0x15: return 'setDelayTimer'
-					case 0x18: return 'setSoundTimer'
-					case 0x1E: return 'addMem'
-					case 0x29: return 'setCharacterInMemory'
-					case 0x33: return 'storeBCD'
-					case 0x55: return 'dumpRegisters'
-					case 0x65: return 'loadRegisters'
+					case 0x07: return ['getDelayTimer',        'X']
+					case 0x0A: return ['awaitKeyPress',        'X']
+					case 0x15: return ['setDelayTimer',        'X']
+					case 0x18: return ['setSoundTimer',        'X']
+					case 0x1E: return ['addMem',               'X']
+					case 0x29: return ['setCharacterInMemory', 'X']
+					case 0x33: return ['storeBCD',             'X']
+					case 0x55: return ['dumpRegisters',        'X']
+					case 0x65: return ['loadRegisters',        'X']
 				}
 			}
 		}
@@ -701,9 +627,18 @@ export default class Instruction {
 	}
 
 	execute() {
-		const name = this.getInstructionName()
-		// console.log(hex(this.code), '=', name)
+		const decoded = this.decode()
+		const name = decoded[0]
+		const values = {
+			N:    this.code & 0x000F,
+			NN:   this.code & 0x00FF,
+			NNN:  this.code & 0x0FFF,
 
-		this[name]()
+			X:   (this.code & 0x0F00) >> 8,
+			Y:   (this.code & 0x00F0) >> 4
+		}
+
+		const args = decoded.slice(1).map(key => values[key])
+		this[name].apply(this, args)
 	}
 }

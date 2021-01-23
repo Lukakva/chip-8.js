@@ -1,5 +1,7 @@
-import Chip8 from './chip-8/Chip'
 import ROMs from './roms'
+
+import Chip8 from './chip-8/Chip'
+import Decompiler from './chip-8/decompiler'
 
 const chip = new Chip8({
 	canvas: 'canvas',
@@ -93,6 +95,7 @@ romsNode.onchange = function() {
 			instructionsNode.innerHTML = xhr.responseText || 'No instructions'
 		}
 		xhr.open('GET', txtFile)
+		xhr.overrideMimeType('text/plain; charset=utf-8')
 		xhr.send()
 	} else {
 		instructionsNode.innerHTML = 'No instructions'
@@ -146,4 +149,5 @@ document.onkeyup = e => {
 	}
 }
 
-window._chip = chip
+window.ROMS = ROMs
+window.decompiler = new Decompiler()

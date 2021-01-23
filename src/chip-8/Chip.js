@@ -1,4 +1,5 @@
 import Screen from './Screen'
+import { fetchRom } from './Shared'
 import Instruction from './Instruction'
 
 const RAM_SIZE = 4 * 1024 // 4 KB
@@ -21,6 +22,7 @@ class Chip8 {
 			throw new Error('Canvas not found:', options.canvas)
 		}
 
+		this.loadRom = this.loadRom.bind(this)
 		this.audioContext = new (AudioContext || webkitAudioContext)
 	}
 
@@ -119,33 +121,9 @@ class Chip8 {
 
 	/* Retrieves a file and loads it into memory */
 	loadRomFromFile(url) {
-		return new Promise((resolve, reject) => {
-			const xhr = new XMLHttpRequest()
-			xhr.open('GET', url)
-			xhr.responseType = 'arraybuffer'
-
-			xhr.onreadystatechange = () => {
-				if (xhr.readyState !== 4) {
-					return
-				}
-
-				if (xhr.status !== 200) {
-					this.screen.renderFailure(new Error(url + ' does not exist'))
-					return
-				}
-
-				try {
-					const rom = new Uint8Array(xhr.response)
-					this.loadRom(rom)
-					resolve()
-				} catch (e) {
-					reject(e)
-				}
-			}
-
-			xhr.onerror = reject
-
-			xhr.send()
+		return fetchRom(url).then(this.loadRom).catch(e => {
+			this.screen.renderFailure(e)
+			throw e
 		})
 	}
 
@@ -205,7 +183,7 @@ class Chip8 {
 			return
 		}
 
-		this.keyboard[key] = 0
+		this.keyboard[index] = 0
 	}
 
 	startBeeping() {
