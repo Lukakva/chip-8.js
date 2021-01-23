@@ -15,6 +15,12 @@ const SCREEN_HEIGHT = 32
 const TIMER_SPEED = 60 // 60Hz
 const INSTRUCTIONS_PER_CYCLE = 10
 
+const clear = arr => {
+	for (let i = 0; i < arr.length; i++) {
+		arr[i] = 0
+	}
+}
+
 class Chip8 {
 	constructor(options) {
 		this.canvas = document.querySelector(options.canvas)
@@ -56,16 +62,38 @@ class Chip8 {
 	init() {
 		/*
 			Initialize the RAM, registers, stack
-			(in order of the Wikipedia article)
+			If the chip was already initialized, clear everything
 		*/
-		this.memory = new Uint8Array(RAM_SIZE)
-		this.loadFontSet()
+		if (this.inited) {
+			clear(this.memory)
+			clear(this.registers)
+			clear(this.stack)
+			clear(this.keyboard)
 
-		/*
-			15 general purpose 8-bit registers (V0-VE)
-			+ 1 carry flag register (VF)
-		*/
-		this.registers = new Uint8Array(N_REGISTERS)
+			this.screen.clear()
+		} else {
+			this.memory = new Uint8Array(RAM_SIZE)
+
+			/*
+				15 general purpose 8-bit registers (V0-VE)
+				+ 1 carry flag register (VF)
+			*/
+			this.registers = new Uint8Array(N_REGISTERS)
+
+			/* The stack (for subroutine calls) */
+			this.stack = new Uint16Array(STACK_SIZE)
+
+			/*
+				Which keys are pressed
+			*/
+			this.keyboard = new Uint8Array(16)
+
+			/*
+				A class for storing 0s and 1s (black and white)
+				but also rendering on canvas
+			*/
+			this.screen = new Screen(SCREEN_WIDTH, SCREEN_HEIGHT, this.canvas)
+		}
 
 		/* 16 bit address register (I) */
 		this.registerI = 0
@@ -73,25 +101,19 @@ class Chip8 {
 		/* Program counter, stack pointer */
 		this.pc = PROGRAM_START
 		this.sp = 0
-		this.halted = true
-		this.paused = false
-		this.screenChanged = false
-
-		/* The stack (for subroutine calls) */
-		this.stack = new Uint16Array(STACK_SIZE)
 
 		/* Timers (both count down at 60Hz) */
 		this.delayTimer = 0
 		this.soundTimer = 0
 
-		/*
-			A class for storing 0s and 1s (black and white)
-			but also rendering on canvas
-		*/
-		this.screen = new Screen(SCREEN_WIDTH, SCREEN_HEIGHT, this.canvas)
-		this.keyboard = new Uint8Array(16)
+		/* Load the font set into the memory */
+		this.loadFontSet()
+		this.screen.render()
 
 		this.inited = true
+		this.halted = true
+		this.paused = false
+		this.screenChanged = false
 	}
 
 	/* Just a cool debugging thing */

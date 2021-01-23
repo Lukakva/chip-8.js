@@ -7,6 +7,7 @@ const chip = new Chip8({
 	canvas: 'canvas',
 	keyboard: '#keyboard'
 })
+chip.init()
 
 let lastButton = null
 const buttons = document.querySelectorAll('.button')
@@ -99,6 +100,9 @@ romsNode.onchange = function() {
 	} else {
 		instructionsNode.innerHTML = 'No instructions'
 	}
+
+	// So the keyboard is usable
+	this.blur()
 }
 
 const keys = [

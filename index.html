@@ -13,6 +13,11 @@ html, body {
 	width: 100%;
 }
 
+body {
+	display: flex;
+	flex-direction: column;
+}
+
 #emulator-wrapper {
 	display: flex;
 	width: 100%;
@@ -21,6 +26,7 @@ html, body {
 	justify-content: center;
 
 	overflow: hidden;
+	flex-shrink: 0;
 }
 
 * {
@@ -101,6 +107,12 @@ canvas {
 	white-space: pre-wrap;
 }
 
+#link {
+	text-align: center;
+	margin-top: auto;
+	margin-bottom: 10px;
+}
+
 </style>
 <body>
 	<div id="emulator-wrapper">
@@ -137,6 +149,9 @@ canvas {
 			<option disabled selected>-- Select a ROM --</option>
 		</select>
 		<div id="instructions">Select a ROM above, and instructions will appear here</div>
+	</div>
+	<div id="link">
+		<a target="_blank" href="https://lukakva.github.io/chip-8.js/">https://lukakva.github.io/chip-8.js/</a>
 	</div>
 </body>
 <script src="./dist/index.bundle.js"></script>
