@@ -13,7 +13,7 @@ const SCREEN_WIDTH = 64
 const SCREEN_HEIGHT = 32
 
 const TIMER_SPEED = 60 // 60Hz
-const OPCODES_PER_CYCLE = 10
+const INSTRUCTIONS_PER_CYCLE = 10
 
 class Chip8 {
 	constructor(options) {
@@ -139,9 +139,11 @@ class Chip8 {
 		return (byte1 << 8) | byte2
 	}
 
-	executeOpcode(opcode) {
+	executeInstruction(opcode) {
 		const instruction = new Instruction(opcode, this)
 		instruction.execute()
+
+		this.instructionsCount++
 	}
 
 	/*
@@ -154,7 +156,6 @@ class Chip8 {
 			return
 		}
 
-		console.log(key + ' was pressed')
 		// Since we have a hex keyboard, we can just parse the index
 		const index = parseInt(key, 16)
 		if (isNaN(index) || index > 0xF) {
@@ -176,7 +177,6 @@ class Chip8 {
 			return
 		}
 
-		console.log(key + ' was released')
 		// Since we have a hex keyboard, we can just parse the index
 		const index = parseInt(key, 16)
 		if (isNaN(index) || index > 0xF) {
@@ -217,10 +217,11 @@ class Chip8 {
 
 		// We need a 60Hz cycle for timers, sure, but the
 		// Processor itself can (and should) be much faster than that
-		for (let i = 0; i < OPCODES_PER_CYCLE; i++) {
+		for (let i = 0; i < INSTRUCTIONS_PER_CYCLE; i++) {
 			const opcode = this.fetchOpcode()
+
 			try {
-				this.executeOpcode(opcode)
+				this.executeInstruction(opcode)
 			} catch (e) {
 				this.screen.renderFailure(e)
 				throw e
@@ -256,6 +257,10 @@ class Chip8 {
 
 	start() {
 		this.halted = false
+
+		this.startTime = Date.now()
+		this.instructionsCount = 0
+
 		this.cycle()
 	}
 

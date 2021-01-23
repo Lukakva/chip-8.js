@@ -1,0 +1,149 @@
+Using registers 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15
+
+512 (0x6A02): player1x = 2
+514 (0x6B0C): player1y = 12
+516 (0x6C3F): player2x = 63
+518 (0x6D0C): player2y = 12
+520 (0xA2EA): setMemoryRegister(746)
+522 (0xDAB6): draw(player1x, player1y, 6)
+524 (0xDCD6): draw(player2x, player2y, 6)
+
+// Init
+526 (0x6E00): scoreboard = 0
+528 (0x22D4): drawScoreBoard()
+530 (0x6603): ballX = 3
+532 (0x6802): velocityX = 2
+538 (0xF007): wait(1600) // Wait 1.6 seconds
+544 (0xC717): ballY = rand(23)
+546 (0x7708): ballY += 8
+548 (0x69FF): velocityY = 255
+550 (0xA2F0): setMemoryRegister(BALL_SPRITE)
+552 (0xD671): draw(ballX, ballY, 1)
+
+
+554 (0xA2EA): setMemoryRegister(746)
+556 (0xDAB6): draw(player1x, player1y, 6)
+558 (0xDCD6): draw(player2x, player2y, 6)
+
+562 (0xE0A1): ifKeyPressed(1)
+564 (0x7BFE):     player1y += 254
+568 (0xE0A1): ifKeyPressed(4)
+570 (0x7B02):     player1y += 2
+572 (0x601F): player1y &= 31 // Limit to 31
+576 (0xDAB6): draw(player1x, player1y, 6)
+
+// Give the player a playing chance. -2 , but if rand(10) then the player 2
+// Matches the ball exactly
+578 (0x8D70): player2y = ballY - 2
+584 (0x4000): if (rand(10) == 0)
+586 (0x7D02):     player2y += 2
+590 (0x601F): player2y &= 31 // Limit to 31
+594 (0xDCD6): draw(player2x, player2y, 6)
+
+596 (0xA2F0): setMemoryRegister(BALL_SPRITE)
+598 (0xD671): draw(ballX, ballY, 1)
+
+600 (0x8684): ballX += velocityX
+602 (0x8794): ballY += velocityY
+604 (0x603F): ballX &= 63
+610 (0x8712): ballY &= 31
+// If the ball reaches the left
+612 (0x4602): if (ballX == 2) {
+614 (0x1278):     jump(632)
+// If the ball reaches the right
+616 (0x463F): if (ballX == 63) {
+618 (0x1282):     jump(642)
+
+620 (0x471F): if (ballY == 31) {
+622 (0x69FF):     velocityY = 255
+622 (0x69FF): }
+624 (0x4700): if (ballY == 0) {
+626 (0x6901):     velocityY = 1
+626 (0x6901): }
+628 (0xD671): draw(ballX, ballY, 1)
+630 (0x122A): jump(554) // Jump back to the loop
+
+// If the ball reaches the left
+632 (0x6802): velocityX = 2
+634 (0x6301): scoreIncrement = 1 // If the ball scores on the left side, right side wins (increment by 1)
+636 (0x8070): register0  = ballY - player1y // With not borrow in VF
+638 (0x8070): register15 = ballY >= player1y
+640 (0x128A): jump(650)
+
+// If the ball reaches the right
+642 (0x68FE): velocityX = 254 // -2
+644 (0x630A): scoreIncrement = 10 // If the ball scores on the left side, right side wins (increment by 10)
+646 (0x8070): register0 = ballY
+648 (0x80D5): register0 -= player2y // VF = ballY >= player2y
+
+650 (0x3F01): if (register15 == 0) // Effectively checking ballY < someY
+652 (0x12A2):     jump(674)
+654 (0x6102): var diff = register0 // Difference between the ball and the top of the pole
+658 (0x3F01): if (diff < 2)
+660 (0x12BA):     jump(698)
+662 (0x8015): diff -= 2
+664 (0x3F01): if (diff < 2)
+666 (0x12C8):     jump(712)
+668 (0x8015): diff -= 2
+670 (0x3F01): if (diff < 2)
+672 (0x12C2):     jump(706)
+
+// Somebody lost, ball crossed
+674 (0x6020): register0 = 32
+676 (0xF018): setSoundTimer(register0) // 0.5 seconds beep
+678 (0x22D4): drawScoreBoard()
+680 (0x8E34): scoreboard += scoreIncrement
+682 (0x22D4): drawScoreBoard()
+684 (0x663E): ballX = 62
+686 (0x3301): if (scoreIncrement != 1) {
+688 (0x6603):     ballX = 3
+688 (0x6603): }
+690 (0x68FE): velocityX = 254
+692 (0x3301): if (scoreIncrement != 1) {
+694 (0x6802):     velocityX = 2
+694 (0x6802): }
+696 (0x1216): jump(534)
+
+// If the ball hits the bottom 2 pixels
+698 (0x79FF): velocityY += 255
+700 (0x49FE): if (velocityY == 254) {
+702 (0x69FF):     velocityY = 255
+702 (0x69FF): }
+704 (0x12C8): jump(712)
+
+// If the ball hits the middle 2 pixels
+706 (0x7901): velocityY += 1
+708 (0x4902): if (velocityY == 2) {
+710 (0x6901):     velocityY = 1
+
+// Ball hits the middle 2 pixels
+712 (0x6004): register0 = 4
+714 (0xF018): setSoundTimer(register0) // Beep for 4 cycles (1/15 seconds)
+716 (0x7601): ballX += 1
+718 (0x4640): if (ballX == 64) {
+720 (0x76FE):     ballX -= 1
+720 (0x76FE): }
+722 (0x126C): jump(620)
+
+/* 724 - 744 */
+function drawScoreBoard() {
+	&registerI = 754
+	storeBCD(scoreboard)
+	loadRegisters(register2)
+
+	let score1 = register1
+	draw(score1, x = 20, y = 0, height = 5)
+
+	let score2 = register2
+	draw(score2, x = 41, y = 0, height = 5)
+
+	return
+}
+
+// Sprites (Vertical lines)
+746 (0x8080): register0 = velocityX
+748 (0x8080): register0 = velocityX
+750 (0x8080): register0 = velocityX
+752 (0x8000): register0 = register0
+754 (0x0000): doNothing()
+756 (0x0000): doNothing()

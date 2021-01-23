@@ -224,7 +224,7 @@ export default class Instruction {
 	}
 
 	/*
-		Opcode: 8XY4
+		Opcode: 8XY5
 		VY is subtracted from VX. VF is set to 0 when there's a borrow,
 		and 1 when there isn't.
 	*/
@@ -237,7 +237,7 @@ export default class Instruction {
 			to X >= Y
 		*/
 		registers[0xF] = registers[X] >= registers[Y]
-		registers[X] -= Y
+		registers[X] -= registers[Y]
 
 		chip.pc += 2
 	}
@@ -248,7 +248,6 @@ export default class Instruction {
 		and then shifts VX to the right by 1.
 	*/
 	shiftRight(X, Y) {
-		// TODO, fix. Why does this need Y argument then?
 		const { chip, chip: {registers} } = this
 
 		// Store the least significant bit
@@ -449,7 +448,7 @@ export default class Instruction {
 		Opcode: FX18
 		Sets the sound timer to VX.
 	*/
-	setSoundTXimer() {
+	setSoundTimer(X) {
 		const { chip } = this
 
 		chip.soundTimer = chip.registers[X]
@@ -626,9 +625,10 @@ export default class Instruction {
 		)
 	}
 
-	execute() {
+	/* Prepares an executable version of the instruction*/
+	executable() {
 		const decoded = this.decode()
-		const name = decoded[0]
+		const method = decoded[0]
 		const values = {
 			N:    this.code & 0x000F,
 			NN:   this.code & 0x00FF,
@@ -638,7 +638,28 @@ export default class Instruction {
 			Y:   (this.code & 0x00F0) >> 4
 		}
 
-		const args = decoded.slice(1).map(key => values[key])
-		this[name].apply(this, args)
+		const argNames = decoded.slice(1)
+		const args = argNames.map(key => values[key])
+
+		return {
+			method,
+			args,
+			argNames,
+		}
+	}
+
+	execute() {
+		const pc = this.chip.pc
+
+		try {
+			const { method, args } = this.executable()
+			this[method].apply(this, args)
+		} catch (e) {
+			console.error(e)
+
+			throw new Error(
+				`Error executing instruction: ${hex(this.code)} (${method})`
+			)
+		}
 	}
 }
