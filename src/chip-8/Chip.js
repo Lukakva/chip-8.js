@@ -94,7 +94,14 @@ class Chip8 {
 				A class for storing 0s and 1s (black and white)
 				but also rendering on canvas
 			*/
-			this.screen = new Screen(SCREEN_WIDTH, SCREEN_HEIGHT, this.canvas)
+			this.screen = new Screen({
+				width: SCREEN_WIDTH,
+				height: SCREEN_HEIGHT,
+				canvas: this.canvas,
+				// Slowly preparing for the ability to change colors
+				onColor: '#ffffff',
+				offColor: '#000000',
+			})
 		}
 
 		/* 16 bit address register (I) */

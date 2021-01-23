@@ -34,3 +34,7 @@ But it's also possible to use a physical, computer keyboard, which respectively 
 | q | w | e | r |
 | a | s | d | f |
 | z | x | c | v |
+
+# Improvements
+
+Could support different extensions of CHIP-8 and some CPU quirks. But so far, I'm not planning on doing that.

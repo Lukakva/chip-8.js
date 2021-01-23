@@ -8,7 +8,9 @@
 const RESOLUTION = 16
 
 export default class Screen {
-	constructor(width, height, canvas) {
+	constructor(options) {
+		const { width, height, canvas, onColor, offColor } = options
+
 		this.height = height
 		this.width = width
 
@@ -18,6 +20,9 @@ export default class Screen {
 		this.canvas.style.imageRendering = 'pixelated'
 
 		this.ctx = canvas.getContext('2d')
+
+		this.onColor = onColor
+		this.offColor = offColor
 
 		// 1 dimensional Uint8Array, instead of a matrix
 		this.pixels = new Uint8Array(height * width)
@@ -105,14 +110,19 @@ export default class Screen {
 		let x = canvas.width / 2
 		let y = canvas.height / 2
 
+		const text = 'Emulator is paused. Press Esc to unpause'
+
 		this.render(true)
 		this.prepareFont()
 
-		ctx.filter = 'none'
-		ctx.fillStyle = 'white'
 		ctx.textAlign = 'center'
 		ctx.textBaseline = 'middle'
 
+		ctx.strokeStyle = this.offColor
+		ctx.lineWidth = RESOLUTION / 4
+		ctx.strokeText(text, x, y)
+
+		ctx.fillStyle = this.onColor
 		ctx.fillText('Emulator is paused. Press Esc to unpause', x, y)
 	}
 
@@ -127,17 +137,37 @@ export default class Screen {
 		this.ctx.fillRect(x + 1, y + 1, RESOLUTION - 2, RESOLUTION - 2)
 	}
 
+	// Transforms hex color into an rgba() value with lower opacity
+	getDimmedColor(color) {
+		const value = parseInt(color.slice(1), 16)
+
+		const r = (value & 0xFF0000) >> 16
+		const g = (value & 0x00FF00) >> 8
+		const b = (value & 0x0000FF)
+		const a = 0.3
+
+		const values = [r, g, b, a].join(', ')
+
+		return 'rgba(' + values + ')'
+	}
+
 	render(paused) {
 		const ctx = this.ctx
 
-		ctx.fillStyle = 'black'
-		ctx.fillRect(0, 0, this.canvas.width, this.canvas.height)
-
-		ctx.fillStyle = paused ? 'rgba(255, 255, 255, 0.5)' : 'white'
+		let { onColor, offColor } = this
 		if (paused) {
-			ctx.filter = 'blur(4px)'
+			onColor = this.getDimmedColor(onColor)
+			offColor = this.getDimmedColor(offColor)
+
+			// Provide a dark background so dimming has an actual effect
+			ctx.fillStyle = 'black'
+			ctx.fillRect(0, 0, this.canvas.width, this.canvas.height)
 		}
 
+		ctx.fillStyle = offColor
+		ctx.fillRect(0, 0, this.canvas.width, this.canvas.height)
+
+		ctx.fillStyle = onColor
 		for (let y = 0; y < this.height; y++) {
 			for (let x = 0; x < this.width; x++) {
 				// Draw a white pixel where necessary
