@@ -621,7 +621,6 @@ export default class Instruction {
 
 		throw new Error(
 			'Unknown instruction: ' + hex(code)
-			+ '. At PC ' + this.chip.pc
 		)
 	}
 
@@ -651,15 +650,7 @@ export default class Instruction {
 	execute() {
 		const pc = this.chip.pc
 
-		try {
-			const { method, args } = this.executable()
-			this[method].apply(this, args)
-		} catch (e) {
-			console.error(e)
-
-			throw new Error(
-				`Error executing instruction: ${hex(this.code)} (${method})`
-			)
-		}
+		const { method, args } = this.executable()
+		this[method].apply(this, args)
 	}
 }

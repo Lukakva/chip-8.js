@@ -48,6 +48,10 @@ export default class Screen {
 		}
 	}
 
+	prepareFont() {
+		this.ctx.font = (RESOLUTION * 1.9) + 'px monospace'
+	}
+
 	/*
 		https://stackoverflow.com/a/16599668/7214615
 	*/
@@ -75,25 +79,24 @@ export default class Screen {
 		const { canvas, ctx } = this
 		const title = 'The emulator aborted with the following error :('
 
-		let x = canvas.width / 2
-		let y = canvas.height / 2
-
 		ctx.fillStyle = 'black'
 		ctx.fillRect(0, 0, canvas.width, canvas.height)
 
-		ctx.font = RESOLUTION + 'px monospace'
+		this.prepareFont()
 		ctx.fillStyle = 'red'
 		ctx.textAlign = 'center'
-
-		ctx.fillText(title, x, y)
-		y += RESOLUTION
+		ctx.textBaseline = 'top'
 
 		const lines = this.getLines(ctx, error.message, canvas.width - 10)
+		lines.unshift(title)
+
+		let x = canvas.width / 2
+		let y = (canvas.height / 2) - (lines.length * RESOLUTION * 2.5) / 2
+
 		lines.forEach(line => {
-			ctx.textBaseline = 'top'
 			ctx.fillText(line, x, y)
 
-			y += 20
+			y += RESOLUTION * 2.5
 		})
 	}
 
@@ -103,8 +106,8 @@ export default class Screen {
 		let y = canvas.height / 2
 
 		this.render(true)
+		this.prepareFont()
 
-		ctx.font = '30px sans-serif'
 		ctx.filter = 'none'
 		ctx.fillStyle = 'white'
 		ctx.textAlign = 'center'

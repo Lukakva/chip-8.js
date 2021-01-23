@@ -1,3 +1,5 @@
+import './AudioContextMonkeyPatch'
+
 import Screen from './Screen'
 import { fetchRom } from './Shared'
 import Instruction from './Instruction'
@@ -29,7 +31,7 @@ class Chip8 {
 		}
 
 		this.loadRom = this.loadRom.bind(this)
-		this.audioContext = new (AudioContext || webkitAudioContext)
+		this.audioContext = new AudioContext()
 	}
 
 	loadFontSet() {
@@ -175,7 +177,7 @@ class Chip8 {
 	*/
 	onKeyDown(key) {
 		// Not initialized yet
-		if (!this.keyboard) {
+		if (!this.inited || this.paused) {
 			return
 		}
 
@@ -196,7 +198,7 @@ class Chip8 {
 
 	onKeyUp(key) {
 		// Not initialized yet
-		if (!this.keyboard) {
+		if (!this.inited || this.paused) {
 			return
 		}
 
