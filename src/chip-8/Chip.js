@@ -74,6 +74,7 @@ class Chip8 {
 		this.pc = PROGRAM_START
 		this.sp = 0
 		this.halted = true
+		this.paused = false
 		this.screenChanged = false
 
 		/* The stack (for subroutine calls) */
@@ -89,6 +90,8 @@ class Chip8 {
 		*/
 		this.screen = new Screen(SCREEN_WIDTH, SCREEN_HEIGHT, this.canvas)
 		this.keyboard = new Uint8Array(16)
+
+		this.inited = true
 	}
 
 	/* Just a cool debugging thing */
@@ -142,8 +145,6 @@ class Chip8 {
 	executeInstruction(opcode) {
 		const instruction = new Instruction(opcode, this)
 		instruction.execute()
-
-		this.instructionsCount++
 	}
 
 	/*
@@ -211,6 +212,10 @@ class Chip8 {
 
 	/* A CPU cycle */
 	cycle() {
+		if (this.paused) {
+			return
+		}
+
 		if (this.halted) {
 			return
 		}
@@ -256,16 +261,25 @@ class Chip8 {
 	}
 
 	start() {
+		if (!this.inited) {
+			return console.warn('Unitialized Chip')
+		}
+
 		this.halted = false
+		this.paused = false
 
-		this.startTime = Date.now()
-		this.instructionsCount = 0
-
+		this.screen.render()
 		this.cycle()
 	}
 
 	pause() {
-		this.halted = true
+		if (!this.inited) {
+			return console.warn('Unitialized Chip')
+		}
+
+		this.paused = true
+		this.stopBeeping()
+		this.screen.renderPaused()
 	}
 }
 

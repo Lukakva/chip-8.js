@@ -3,6 +3,9 @@ import Instruction from './Instruction'
 
 import { hex } from './Shared'
 
+/*
+	An unfinished class. Used this to debug some problems with the Pong game
+*/
 export default class Decompiler {
 	loadRom(url) {
 		return fetchRom(url).then(rom => {

@@ -97,6 +97,22 @@ export default class Screen {
 		})
 	}
 
+	renderPaused() {
+		const { canvas, ctx } = this
+		let x = canvas.width / 2
+		let y = canvas.height / 2
+
+		this.render(true)
+
+		ctx.font = '30px sans-serif'
+		ctx.filter = 'none'
+		ctx.fillStyle = 'white'
+		ctx.textAlign = 'center'
+		ctx.textBaseline = 'middle'
+
+		ctx.fillText('Emulator is paused. Press Esc to unpause', x, y)
+	}
+
 	/*
 		A seperate function so that rendering can have a complex logic
 		A single pixel is scaled to the value of the RESOLUTION
@@ -105,17 +121,19 @@ export default class Screen {
 		x *= RESOLUTION
 		y *= RESOLUTION
 
-		this.ctx.fillStyle = 'white'
 		this.ctx.fillRect(x + 1, y + 1, RESOLUTION - 2, RESOLUTION - 2)
 	}
 
-	render() {
+	render(paused) {
 		const ctx = this.ctx
 
 		ctx.fillStyle = 'black'
 		ctx.fillRect(0, 0, this.canvas.width, this.canvas.height)
 
-		ctx.fillStyle = 'white'
+		ctx.fillStyle = paused ? 'rgba(255, 255, 255, 0.5)' : 'white'
+		if (paused) {
+			ctx.filter = 'blur(4px)'
+		}
 
 		for (let y = 0; y < this.height; y++) {
 			for (let x = 0; x < this.width; x++) {

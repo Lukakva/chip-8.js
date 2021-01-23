@@ -72,7 +72,6 @@ for (let groupName in groups) {
 }
 
 romsNode.onchange = function() {
-	chip.pause()
 	chip.init()
 
 	const romIndex = this.value
@@ -135,6 +134,14 @@ document.onkeydown = e => {
 			button.onmousedown()
 		}
 	}
+
+	if (key === 'Escape') {
+		if (chip.paused) {
+			chip.start()
+		} else {
+			chip.pause()
+		}
+	}
 }
 
 document.onkeyup = e => {
@@ -149,5 +156,4 @@ document.onkeyup = e => {
 	}
 }
 
-window.ROMS = ROMs
-window.decompiler = new Decompiler()
+window.onblur  = e => chip.pause()
