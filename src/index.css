@@ -19,6 +19,8 @@ body {
 
 	overflow: hidden;
 	flex-shrink: 0;
+
+	padding: 10px;
 }
 
 * {
@@ -30,7 +32,6 @@ canvas {
 	border: 4px double black;
 	border-radius: 10px;
 	overflow: hidden;
-	margin-top: 10px;
 	width: 800px;
 }
 
@@ -80,6 +81,7 @@ canvas {
 	flex-direction: column;
 	align-items: center;
 	overflow: hidden;
+	flex: 1;
 
 	margin-left: -106px;
 }
@@ -103,4 +105,25 @@ canvas {
 	text-align: center;
 	margin-top: auto;
 	margin-bottom: 10px;
+}
+
+@media only screen and (max-width: 768px) {
+	#emulator-wrapper {
+		flex-direction: column;
+	}
+
+	canvas {
+		width: 100%;
+		margin-bottom: 10px;
+	}
+
+	#roms-wrapper {
+		margin-left: 0;
+		padding: 10px;
+		padding-top: 0;
+	}
+
+	#roms, #instructions {
+		width: 100%;
+	}
 }

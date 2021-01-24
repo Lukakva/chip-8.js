@@ -110,7 +110,10 @@ export default class Screen {
 		let x = canvas.width / 2
 		let y = canvas.height / 2
 
-		const text = 'Emulator is paused. Press Esc to unpause'
+		let text = 'Emulator is paused. Press Esc to unpause'
+		if ('ontouchstart' in window) {
+			text = 'Emulator is paused. Touch to unpause'
+		}
 
 		this.render(true)
 		this.prepareFont()
@@ -123,7 +126,7 @@ export default class Screen {
 		ctx.strokeText(text, x, y)
 
 		ctx.fillStyle = this.onColor
-		ctx.fillText('Emulator is paused. Press Esc to unpause', x, y)
+		ctx.fillText(text, x, y)
 	}
 
 	/*

@@ -13,20 +13,32 @@ chip.init()
 
 let lastButton = null
 const buttons = document.querySelectorAll('.button')
+const isTouchScreen = 'ontouchstart' in window
+
+function onButtonPress() {
+	console.log('Button down')
+	this.setAttribute('class', 'button active')
+	chip.onKeyDown(this.innerText.trim())
+
+	lastButton = this
+}
+
+function onButtonRelease() {
+	console.log('Button up')
+	lastButton = null
+
+	this.setAttribute('class', 'button')
+	chip.onKeyUp(this.innerText.trim())
+}
+
 for (let i = 0; i < buttons.length; i++) {
 	const button = buttons[i]
-	button.onmousedown = () => {
-		button.setAttribute('class', 'button active')
-		chip.onKeyDown(button.innerText.trim())
-
-		lastButton = button
-	}
-
-	button.onmouseup = () => {
-		lastButton = null
-
-		button.setAttribute('class', 'button')
-		chip.onKeyUp(button.innerText.trim())
+	if (isTouchScreen) {
+		button.ontouchstart = onButtonPress
+		button.ontouchend = onButtonRelease
+	} else {
+		button.onmousedown = onButtonPress
+		button.onmouseup = onButtonRelease
 	}
 }
 
@@ -114,40 +126,50 @@ const keys = [
 	'v', // 15
 ]
 
-document.onkeydown = e => {
-	if (e.metaKey || e.ctrlKey || e.shiftKey) {
-		return
-	}
+if (!isTouchScreen) {
+	document.onkeydown = e => {
+		if (e.metaKey || e.ctrlKey || e.shiftKey) {
+			return
+		}
 
-	const key = e.key
-	const index = keys.indexOf(key)
-	if (index > -1) {
-		const value = index.toString(16).toUpperCase()
-		const button = document.querySelector(`[data-value='${value}']`)
-		if (button) {
-			button.onmousedown()
+		const key = e.key
+		const index = keys.indexOf(key)
+		if (index > -1) {
+			const value = index.toString(16).toUpperCase()
+			const button = document.querySelector(`[data-value='${value}']`)
+			if (button) {
+				button.onmousedown()
+			}
+		}
+
+		if (key === 'Escape') {
+			if (chip.paused) {
+				chip.start()
+			} else {
+				chip.pause()
+			}
 		}
 	}
 
-	if (key === 'Escape') {
+	document.onkeyup = e => {
+		const key = e.key
+		const index = keys.indexOf(key)
+		if (index > -1) {
+			const value = index.toString(16).toUpperCase()
+			const button = document.querySelector(`[data-value='${value}']`)
+			if (button) {
+				button.onmouseup()
+			}
+		}
+	}
+} else {
+	document.querySelector('canvas').addEventListener('touchstart', () => {
 		if (chip.paused) {
 			chip.start()
 		} else {
 			chip.pause()
 		}
-	}
-}
-
-document.onkeyup = e => {
-	const key = e.key
-	const index = keys.indexOf(key)
-	if (index > -1) {
-		const value = index.toString(16).toUpperCase()
-		const button = document.querySelector(`[data-value='${value}']`)
-		if (button) {
-			button.onmouseup()
-		}
-	}
+	})
 }
 
 window.onblur = e => chip.pause()
