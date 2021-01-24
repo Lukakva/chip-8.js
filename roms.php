@@ -13,7 +13,8 @@ $files = array_map(function($path) {
 	$txt = "$directory/$name.txt";
 	$instructions = 'No instructions';
 	if (file_exists($txt)) {
-		$instructions = htmlentities(file_get_contents($txt));
+		$instructions = file_get_contents($txt);
+		$instructions = utf8_encode($instructions);
 	}
 
 	return [
@@ -22,5 +23,5 @@ $files = array_map(function($path) {
 	];
 }, $files);
 
-$json = json_encode($files, JSON_PRETTY_PRINT);
+$json = json_encode($files, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
 file_put_contents('src/roms/roms.json', $json);
