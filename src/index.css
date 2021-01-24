@@ -129,9 +129,9 @@ canvas {
 	}
 
 	.button {
-		width: 30px;
-		height: 30px;
-		line-height: 30px;
+		width: 35px;
+		height: 35px;
+		line-height: 35px;
 
 		-webkit-tap-highlight-color: rgba(0, 0, 0, 0);
 		-webkit-tap-highlight-color: transparent;
