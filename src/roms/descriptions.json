@@ -1,6 +1,6 @@
 {
     "chip8-roms\/games\/Pong (1 player).ch8": "1 - Move up, 4 - move down",
-    "chip8-roms\/games\/Pong (alt).ch8": "1 - Move up, 4 - move down",
+    "chip8-roms\/games\/Pong (alt).ch8": "This is a 2 player game:\n\n Player 1: 1 - Up, 4 - Down\nPlayer 2: C - Up, D - Down",
     "chip8-roms\/games\/Soccer.ch8": "This is a 2 player game:\n\n Player 1: 1 - Up, 4 - Down\nPlayer 2: C - Up, D - Down",
     "chip8-roms\/games\/ZeroPong [zeroZshadow, 2007].ch8": "F - Start/Restart. This is a 2 player game:\n\n Player 1: A - Down, B - Up\nPlayer 2: 2 - Up, 8 - Down",
     "chip8-roms\/games\/Pong [Paul Vervalin, 1990].ch8": "OK. here is PONG version 1.1.  The ball is a little faster in this\nversion making play a little more realistic.  I know PONG 1.0 was\njust posted yesterday, but I think this version is significantly\nbetter, so here it is.\n\nUse keys 1 and 4 to move left player and C and D to move the right player.\n\nEnjoy!!\n\n",
