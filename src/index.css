@@ -58,9 +58,8 @@ canvas {
 	width: 40px;
 	height: 40px;
 	text-align: center;
-	line-height: 30px;
+	line-height: 40px;
 
-	padding: 5px;
 	margin: 5px;
 
 	background: rgba(0, 0, 0, 0.1);
@@ -97,6 +96,7 @@ canvas {
 	margin-bottom: 10px;
 	overflow: auto;
 	width: 600px;
+	font-size: 13px;
 
 	white-space: pre-wrap;
 }
@@ -110,11 +110,20 @@ canvas {
 @media only screen and (max-width: 768px) {
 	#emulator-wrapper {
 		flex-direction: column;
+		padding-bottom: 0;
 	}
 
 	canvas {
 		width: 100%;
 		margin-bottom: 10px;
+	}
+
+	.button {
+		width: 30px;
+		height: 30px;
+		line-height: 30px;
+
+		margin: 3px;
 	}
 
 	#roms-wrapper {
@@ -123,7 +132,19 @@ canvas {
 		padding-top: 0;
 	}
 
+	#roms-wrapper * {
+		font-size: 11px;
+	}
+
 	#roms, #instructions {
 		width: 100%;
+	}
+
+	#instructions {
+		padding: 5px;
+	}
+
+	#link {
+		margin-bottom: 0;
 	}
 }
