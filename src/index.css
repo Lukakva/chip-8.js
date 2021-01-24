@@ -65,6 +65,8 @@ canvas {
 	background: rgba(0, 0, 0, 0.1);
 	cursor: pointer;
 	box-shadow: 0 3px rgba(0, 0, 0, 0.2);
+
+	font-size: 14px;
 }
 
 .button.active {
@@ -83,6 +85,10 @@ canvas {
 	flex: 1;
 
 	margin-left: -106px;
+}
+
+#roms-wrapper * {
+	font-size: 13px;
 }
 
 #roms {
