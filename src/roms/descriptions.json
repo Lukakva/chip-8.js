@@ -1,5 +1,10 @@
 {
     "chip8-roms\/games\/Pong (1 player).ch8": "1 - Move up, 4 - move down",
+    "chip8-roms\/games\/Pong (alt).ch8": "1 - Move up, 4 - move down",
+    "chip8-roms\/games\/Soccer.ch8": "This is a 2 player game:\n\n Player 1: 1 - Up, 4 - Down\nPlayer 2: C - Up, D - Down",
+    "chip8-roms\/games\/ZeroPong [zeroZshadow, 2007].ch8": "F - Start/Restart. This is a 2 player game:\n\n Player 1: A - Down, B - Up\nPlayer 2: 2 - Up, 8 - Down",
+    "chip8-roms\/games\/Pong [Paul Vervalin, 1990].ch8": "OK. here is PONG version 1.1.  The ball is a little faster in this\nversion making play a little more realistic.  I know PONG 1.0 was\njust posted yesterday, but I think this version is significantly\nbetter, so here it is.\n\nUse keys 1 and 4 to move left player and C and D to move the right player.\n\nEnjoy!!\n\n",
+    "chip8-roms\/games\/Pong 2 (Pong hack) [David Winter, 1997].ch8": "This is a 2 player game:\n\n Player 1: 1 - Up, 4 - Down\nPlayer 2: C - Up, D - Down",
     "chip8-roms\/games\/Airplane.ch8": "Press 8 to drop a package. Package has to reach the ground without hitting anything else",
     "chip8-roms\/games\/Landing.ch8": "Press 8 to drop a bomb. Slowly deteriorate the landscape. The airplane is slowly descending and you will lose if you hit the mountain.",
     "chip8-roms\/games\/Blinky [Hans Christian Egeberg, 1991].ch8": "3 - Up, 6 - Down, 7 - Left, 8 - Right. Eat all of the crumbs",

@@ -1,7 +1,9 @@
-import ROMs from './roms/index'
+import ROMs from './roms'
 
 import Chip8 from './chip-8/Chip'
 import Decompiler from './chip-8/decompiler'
+
+import './index.css'
 
 const chip = new Chip8({
 	canvas: 'canvas',

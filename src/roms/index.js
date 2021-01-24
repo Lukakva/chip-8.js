@@ -5,7 +5,6 @@ const ROMs = [...roms]
 
 /* Add my own descriptions to some of the ROMs that don't have any */
 for (let file in descriptions) {
-	console.log(file)
 	const index = ROMs.findIndex(rom => rom.bin === file)
 	if (index > -1) {
 		ROMs[index].txt = descriptions[file]

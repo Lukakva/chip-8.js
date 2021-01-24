@@ -1,0 +1,106 @@
+html, body {
+	margin: 0;
+	padding: 0;
+	height: 100%;
+	width: 100%;
+}
+
+body {
+	display: flex;
+	flex-direction: column;
+}
+
+#emulator-wrapper {
+	display: flex;
+	width: 100%;
+	flex-direction: row;
+	align-items: center;
+	justify-content: center;
+
+	overflow: hidden;
+	flex-shrink: 0;
+}
+
+* {
+	box-sizing: border-box;
+	font-family: monospace;
+}
+
+canvas {
+	border: 4px double black;
+	border-radius: 10px;
+	overflow: hidden;
+	margin-top: 10px;
+	width: 800px;
+}
+
+#keyboard {
+	display: flex;
+	flex-direction: column;
+	border: 1px solid rgba(0, 0, 0, 0.2);
+	margin-left: 10px;
+
+	-webkit-user-select: none;
+	-moz-user-select: none;
+	user-select: none;
+}
+
+.row {
+	display: flex;
+}
+
+.row:last-child .button {
+	margin-bottom: 8px;
+}
+
+.button {
+	width: 40px;
+	height: 40px;
+	text-align: center;
+	line-height: 30px;
+
+	padding: 5px;
+	margin: 5px;
+
+	background: rgba(0, 0, 0, 0.1);
+	cursor: pointer;
+	box-shadow: 0 3px rgba(0, 0, 0, 0.2);
+}
+
+.button.active {
+	margin-top: 8px;
+	margin-bottom: 2px !important;
+	box-shadow: none;
+	background: rgba(0, 0, 0, 0.3);
+}
+
+#roms-wrapper {
+	width: 100%;
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	overflow: hidden;
+
+	margin-left: -106px;
+}
+
+#roms {
+	margin: 10px 0;
+	width: 600px;
+}
+
+#instructions {
+	padding: 10px;
+	border: 1px solid rgba(0, 0, 0, 0.1);
+	margin-bottom: 10px;
+	overflow: auto;
+	width: 600px;
+
+	white-space: pre-wrap;
+}
+
+#link {
+	text-align: center;
+	margin-top: auto;
+	margin-bottom: 10px;
+}
