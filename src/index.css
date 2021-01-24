@@ -118,12 +118,24 @@ canvas {
 		margin-bottom: 10px;
 	}
 
+	.row:last-child .button {
+		margin-bottom: 6px;
+	}
+
 	.button {
 		width: 30px;
 		height: 30px;
 		line-height: 30px;
 
+		-webkit-tap-highlight-color: rgba(0, 0, 0, 0);
+		-webkit-tap-highlight-color: transparent;
+
 		margin: 3px;
+	}
+
+	.button.active {
+		margin-top: 6px;
+		margin-bottom: 0px !important;
 	}
 
 	#roms-wrapper {
