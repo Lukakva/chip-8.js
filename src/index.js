@@ -48,6 +48,11 @@ ROMs.forEach((rom, index) => {
 	// Parent folder
 	const group = components.pop()
 
+	// CHIP-8 doesn't support the instructiosn from the Hires games
+	if (group === 'hires') {
+		return
+	}
+
 	// Slice off the extension
 	const romName = binary.slice(0, -4)
 
