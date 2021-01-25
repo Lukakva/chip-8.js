@@ -1,9 +1,7 @@
-import ROMs from './roms'
-
-import Chip8 from './chip-8/Chip'
-import Decompiler from './chip-8/decompiler'
-
 import './index.css'
+
+import ROMs from './roms'
+import Chip8 from './chip-8/Chip'
 
 const chip = new Chip8({
 	canvas: 'canvas',
@@ -11,103 +9,22 @@ const chip = new Chip8({
 })
 chip.init()
 
+const toggleChip = () => {
+	if (chip.paused) {
+		chip.start()
+	} else {
+		chip.pause()
+	}
+}
+
+const ucfirst = str => str[0].toUpperCase() + str.slice(1)
+
 let lastButton = null
 const buttons = document.querySelectorAll('.button')
-const isTouchScreen = 'ontouchstart' in window
-
-function onButtonPress() {
-	console.log('Button down')
-	this.setAttribute('class', 'button active')
-	chip.onKeyDown(this.innerText.trim())
-
-	lastButton = this
-}
-
-function onButtonRelease() {
-	console.log('Button up')
-	lastButton = null
-
-	this.setAttribute('class', 'button')
-	chip.onKeyUp(this.innerText.trim())
-}
-
-for (let i = 0; i < buttons.length; i++) {
-	const button = buttons[i]
-	if (isTouchScreen) {
-		button.ontouchstart = onButtonPress
-		button.ontouchend = onButtonRelease
-	} else {
-		button.onmousedown = onButtonPress
-		button.onmouseup = onButtonRelease
-	}
-}
-
-document.onmouseup = () => {
-	if (lastButton !== null) {
-		lastButton.onmouseup()
-	}
-}
-
-/* Generate options for the ROM selector */
 const romsNode = document.querySelector('#roms')
 const instructionsNode = document.querySelector('#instructions')
-const groups = {}
-
-/* Generate option groups (demos, games, programs) */
-ROMs.forEach((rom, index) => {
-	const option = document.createElement('option')
-
-	const components = rom.bin.split('/')
-	const binary = components.pop()
-	// Parent folder
-	const group = components.pop()
-
-	// CHIP-8 doesn't support the instructiosn from the Hires games
-	if (group === 'hires') {
-		return
-	}
-
-	// Slice off the extension
-	const romName = binary.slice(0, -4)
-
-	option.value = index
-	option.innerHTML = romName
-
-	if (!groups.hasOwnProperty(group)) {
-		groups[group] = []
-	}
-
-	groups[group].push(option)
-})
-
-/* Append the optgroups to the Select node */
-for (let groupName in groups) {
-	const group = groups[groupName]
-	const label = groupName[0].toUpperCase() + groupName.slice(1)
-	const optgroup = document.createElement('optgroup')
-
-	group.forEach(opt => optgroup.appendChild(opt))
-	optgroup.setAttribute('label', label)
-	romsNode.appendChild(optgroup)
-}
-
-romsNode.onchange = function() {
-	chip.init()
-
-	const romIndex = this.value
-	const rom = ROMs[romIndex]
-
-	chip.loadRomFromFile(rom.bin).then(() => {
-		chip.start()
-	})
-
-	instructionsNode.innerHTML = rom.txt
-
-	// So the keyboard is usable
-	this.blur()
-}
-
-const keys = [
+const isTouchScreen = 'ontouchstart' in window
+const Keys = [
 	'x', // 0
 	'1', // 1
 	'2', // 2
@@ -126,50 +43,126 @@ const keys = [
 	'v', // 15
 ]
 
-if (!isTouchScreen) {
-	document.onkeydown = e => {
-		if (e.metaKey || e.ctrlKey || e.shiftKey) {
-			return
-		}
+/* Keyboard interaction */
+function onButtonPress() {
+	this.setAttribute('class', 'button active')
+	chip.onKeyDown(this.innerText.trim())
 
-		const key = e.key
-		const index = keys.indexOf(key)
-		if (index > -1) {
-			const value = index.toString(16).toUpperCase()
-			const button = document.querySelector(`[data-value='${value}']`)
-			if (button) {
-				button.onmousedown()
-			}
-		}
+	lastButton = this
+}
 
-		if (key === 'Escape') {
-			if (chip.paused) {
-				chip.start()
-			} else {
-				chip.pause()
-			}
-		}
+function onButtonRelease() {
+	lastButton = null
+
+	this.setAttribute('class', 'button')
+	chip.onKeyUp(this.innerText.trim())
+}
+
+buttons.forEach(button => {
+	const press   = isTouchScreen ? 'touchstart' : 'mousedown'
+	const release = isTouchScreen ? 'touchend'   : 'mouseup'
+
+	button.addEventListener(press, onButtonPress)
+	button.addEventListener(release, onButtonRelease)
+})
+
+document.addEventListener('mouseup', () => {
+	if (lastButton !== null) {
+		lastButton.onmouseup()
+	}
+})
+
+/* Generate ROM groups (demos, games, programs) */
+const groups = {}
+ROMs.forEach((rom, index) => {
+	// chip-8/games/Game.ch8 (ignore chip-8)
+	const [, group, binary] = rom.bin.split('/')
+	// This implementation doesn't support the instructios from the Hires games
+	if (group === 'hires') {
+		return
 	}
 
-	document.onkeyup = e => {
-		const key = e.key
-		const index = keys.indexOf(key)
-		if (index > -1) {
-			const value = index.toString(16).toUpperCase()
-			const button = document.querySelector(`[data-value='${value}']`)
-			if (button) {
-				button.onmouseup()
-			}
-		}
+	if (!groups.hasOwnProperty(group)) {
+		groups[group] = []
 	}
-} else {
-	document.querySelector('canvas').addEventListener('touchstart', () => {
-		if (chip.paused) {
-			chip.start()
-		} else {
-			chip.pause()
+
+	// Slice off the extension
+	const romName = binary.slice(0, -4)
+	groups[group].push({
+		index,
+		romName
+	})
+})
+
+/* Append the optgroups to the Select node */
+for (let groupName in groups) {
+	const groupNode = document.createElement('optgroup')
+	const options = groups[groupName]
+
+	options.forEach(option => {
+		const optionNode = document.createElement('option')
+		optionNode.value = option.index
+		optionNode.innerHTML = option.romName
+
+		groupNode.appendChild(optionNode)
+	})
+
+	groupNode.setAttribute('label', ucfirst(groupName))
+	romsNode.appendChild(groupNode)
+}
+
+romsNode.addEventListener('change', function() {
+	const rom = ROMs[this.value]
+
+	chip.init()
+	chip.loadRomFromFile(rom.bin).then(() => chip.start())
+
+	// Display the instructions for this rom
+	instructionsNode.innerHTML = rom.txt
+
+	// So the keyboard is usable
+	this.blur()
+})
+
+// Returns a button (if any) that represents a physical key that was pressed
+function getButtonForEvent(e) {
+	if (e.metaKey || e.ctrlKey || e.shiftKey) {
+		return false
+	}
+
+	const key = e.key
+	const index = Keys.indexOf(key)
+	if (index > -1) {
+		const value = index.toString(16).toUpperCase()
+		const button = document.querySelector(`[data-value='${value}']`)
+		return button
+	}
+
+	return false
+}
+
+// Redirects a physical key event to a button mouse event
+function redirectKeyboardEvent(event, callback) {
+	document.addEventListener(event, e => {
+		const button = getButtonForEvent(e)
+		if (button) {
+			callback.call(button)
 		}
 	})
 }
 
-window.onblur = e => chip.pause()
+if (!isTouchScreen) {
+	redirectKeyboardEvent('keydown', onButtonPress)
+	redirectKeyboardEvent('keyup', onButtonRelease)
+
+	document.addEventListener('keydown', e => {
+		if (e.key === 'Escape') {
+			toggleChip()
+		}
+	})
+} else {
+	const canvas = document.querySelector('canvas')
+	canvas.addEventListener('touchstart', toggleChip)
+}
+
+window.addEventListener('blur', chip.pause)

@@ -1,7 +1,7 @@
 import './AudioContextMonkeyPatch'
 
 import Screen from './Screen'
-import { fetchRom } from './Shared'
+import { fetchRom, clear } from './Shared'
 import Instruction from './Instruction'
 
 const RAM_SIZE = 4 * 1024 // 4 KB
@@ -17,12 +17,6 @@ const SCREEN_HEIGHT = 32
 const TIMER_SPEED = 60 // 60Hz
 const INSTRUCTIONS_PER_CYCLE = 10
 
-const clear = arr => {
-	for (let i = 0; i < arr.length; i++) {
-		arr[i] = 0
-	}
-}
-
 class Chip8 {
 	constructor(options) {
 		this.canvas = document.querySelector(options.canvas)
@@ -30,12 +24,13 @@ class Chip8 {
 			throw new Error('Canvas not found:', options.canvas)
 		}
 
+		this.pause = this.pause.bind(this)
 		this.loadRom = this.loadRom.bind(this)
 		this.audioContext = new AudioContext()
 	}
 
 	loadFontSet() {
-		// A list of sprites for all 16 hex characters
+		// A list of sprites for all 16 hex characters (4x5 pixels)
 		const font = [
 	        0xF0, 0x90, 0x90, 0x90, 0xF0, // 0
 	        0x20, 0x60, 0x20, 0x20, 0x70, // 1
@@ -125,18 +120,6 @@ class Chip8 {
 		this.screenChanged = false
 	}
 
-	/* Just a cool debugging thing */
-	visualizeMemory() {
-		const memory = this.memory
-		for (let i = 0; i < memory.length; i += 2) {
-			const opcode = (memory[i] << 8) | (memory[i + 1])
-			if (opcode === 0) {
-				continue
-			}
-			console.log(i.toString(16).toUpperCase(), opcode.toString(16).toUpperCase())
-		}
-	}
-
 	loadRom(rom) {
 		if (rom instanceof Uint8Array === false) {
 			throw new Error('loadRom requires a Uint8Array')
@@ -162,14 +145,14 @@ class Chip8 {
 	}
 
 	/*
-		Fetches an opcode from the memory, based on the program counter
-		an opcode is 2 bytes long, so 2 bytes need to be joined
+		Fetches an opcode from the memory, based on the program counter.
+		An opcode is 2 bytes long, so 2 bytes need to be joined
 	*/
 	fetchOpcode() {
 		const byte1 = this.memory[this.pc]
 		const byte2 = this.memory[this.pc + 1]
 
-		// Create a 16 bit integer, containing the both bytes
+		// Create a 16 bit integer, containing both bytes
 		return (byte1 << 8) | byte2
 	}
 
@@ -243,16 +226,19 @@ class Chip8 {
 
 	/* A CPU cycle */
 	cycle() {
-		if (this.paused) {
+		if (this.paused || this.halted) {
 			return
 		}
 
-		if (this.halted) {
-			return
-		}
-
-		// We need a 60Hz cycle for timers, sure, but the
-		// Processor itself can (and should) be much faster than that
+		/*
+			We need a 60Hz cycle for timers, but the processor can (and should)
+			run much faster than that. I've experimented with cycling
+			every millisecond and counting down timers every 16th cycle
+			(to simulate 60Hz) but it didn't work.
+			(Probably setTimeout is not that accurate)
+			So instead the main cycle is 60Hz and the instructions are executed
+			at a faster rate
+		*/
 		for (let i = 0; i < INSTRUCTIONS_PER_CYCLE; i++) {
 			const opcode = this.fetchOpcode()
 
@@ -269,8 +255,12 @@ class Chip8 {
 			this.screenChanged = false
 		}
 
-		this.updateTimers()
+		if (this.delayTimer > 0) {
+			this.delayTimer--
+		}
+
 		if (this.soundTimer > 0) {
+			this.soundTimer--
 			this.startBeeping()
 		} else {
 			this.stopBeeping()
@@ -279,16 +269,6 @@ class Chip8 {
 		setTimeout(() => {
 			this.cycle()
 		}, 1000 / TIMER_SPEED)
-	}
-
-	updateTimers() {
-		if (this.delayTimer > 0) {
-			this.delayTimer--
-		}
-
-		if (this.soundTimer > 0) {
-			this.soundTimer--
-		}
 	}
 
 	start() {

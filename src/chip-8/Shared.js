@@ -39,4 +39,10 @@ const hex = n => {
 	return '0x' + str
 }
 
-export { fetchRom, hex }
+const clear = arr => {
+	for (let i = 0; i < arr.length; i++) {
+		arr[i] = 0
+	}
+}
+
+export { fetchRom, hex, clear }

@@ -4,7 +4,9 @@
 	between the Chip8 and the Canvas and provides some additional features
 	(like rendering error messages on exceptions)
 */
+import { clear } from './Shared'
 
+// Device pixels per emulator pixels
 const RESOLUTION = 16
 
 export default class Screen {
@@ -48,9 +50,7 @@ export default class Screen {
 	}
 
 	clear() {
-		for (let i = 0; i < this.pixels.length; i++) {
-			this.pixels[i] = 0
-		}
+		clear(this.pixels)
 	}
 
 	prepareFont() {
@@ -137,6 +137,7 @@ export default class Screen {
 		x *= RESOLUTION
 		y *= RESOLUTION
 
+		// 1 px border around the pixel
 		this.ctx.fillRect(x + 1, y + 1, RESOLUTION - 2, RESOLUTION - 2)
 	}
 
