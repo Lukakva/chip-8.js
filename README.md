@@ -8,14 +8,14 @@ Yet another Chip-8 Virtual Machine! Supports all 35 opcodes.
 
 | Spec | Value |
 |---|---|
-| CPU | 8 bit @ 60 Hz / 480 IPS |
+| CPU | 8 bit @ 600 Hz |
 | Memory | 4 KB |
 | Registers | 16 8-bit registers + 1 16-bit memory register |
 | Stack | Allows up to 16 subroutine calls
 | Timers | 2 internal 60Hz timers
 | Screen | 64x32 @ 60FPS
 
-This codebase tries to make a good use of Uint8Array and Uint16Array classes in JavaScript. Tries.
+This codebase tries to make a good use of Uint8Array and Uint16Array classes in JavaScript. Tries to.
 
 # Keyboard
 
@@ -37,4 +37,4 @@ But it's also possible to use a physical, computer keyboard, which respectively 
 
 # Improvements
 
-Could support different extensions of CHIP-8 and some CPU quirks. But so far, I'm not planning on doing that.
+Could support different extensions and versions of CHIP-8 (like CHIP-10), some CPU quirks, and changing colors, screen dimensions, and even some other options. But so far, I'm not planning on doing that.
