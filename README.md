@@ -1,8 +1,8 @@
 # CHIP-8 Emulator
 
-Yet another Chip-8 Virtual Machine! Supports all 35 opcodes.
+Demo: <https://lukakva.github.io/chip-8.js/>
 
-<https://lukakva.github.io/chip-8.js/>
+Yet another Chip-8 Virtual Machine! Supports all 35 opcodes <https://en.wikipedia.org/wiki/CHIP-8#Opcode_table>
 
 # Specs
 
