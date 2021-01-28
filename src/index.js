@@ -22,6 +22,7 @@ const ucfirst = str => str[0].toUpperCase() + str.slice(1)
 let lastButton = null
 const buttons = document.querySelectorAll('.button')
 const romsNode = document.querySelector('#roms')
+const reloadButton = document.querySelector('#reload')
 const instructionsNode = document.querySelector('#instructions')
 const isTouchScreen = 'ontouchstart' in window
 const Keys = [
@@ -64,6 +65,13 @@ buttons.forEach(button => {
 
 	button.addEventListener(press, onButtonPress)
 	button.addEventListener(release, onButtonRelease)
+
+	button.addEventListener('contextmenu', e => {
+		e.preventDefault()
+		e.cancelBubbles = true
+		e.stopPropagation()
+		return false
+	})
 })
 
 document.addEventListener('mouseup', () => {
@@ -111,17 +119,28 @@ for (let groupName in groups) {
 	romsNode.appendChild(groupNode)
 }
 
-romsNode.addEventListener('change', function() {
-	const rom = ROMs[this.value]
+function loadSelectedRom() {
+	// When the first ROM is loaded, display the RELOAD button
+	reloadButton.removeAttribute('style')
+
+	const rom = ROMs[romsNode.value]
 
 	chip.init()
 	chip.loadRomFromFile(rom.bin).then(() => chip.start())
 
 	// Display the instructions for this rom
 	instructionsNode.innerHTML = rom.txt
+}
+
+romsNode.addEventListener('change', function() {
+	loadSelectedRom()
 
 	// So the keyboard is usable
 	this.blur()
+})
+
+reloadButton.addEventListener(isTouchScreen ? 'touchdown' : 'click', () => {
+	loadSelectedRom()
 })
 
 // Returns a button (if any) that represents a physical key that was pressed

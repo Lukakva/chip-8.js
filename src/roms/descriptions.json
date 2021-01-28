@@ -9,5 +9,6 @@
     "chip8-roms\/games\/Landing.ch8": "Press 8 to drop a bomb. Slowly deteriorate the landscape. The airplane is slowly descending and you will lose if you hit the mountain.",
     "chip8-roms\/games\/Blinky [Hans Christian Egeberg, 1991].ch8": "3 - Up, 6 - Down, 7 - Left, 8 - Right. Eat all of the crumbs",
     "chip8-roms\/games\/Brix [Andreas Gustafsson, 1990].ch8": "4 - Left, 6 - Right",
-    "chip8-roms\/games\/Cave.ch8": "2 - Up, 4 - Left, 6 - Right, 8 - Down, F - Start"
+    "chip8-roms\/games\/Cave.ch8": "2 - Up, 4 - Left, 6 - Right, 8 - Down, F - Start",
+    "chip8-roms\/games\/Tic-Tac-Toe [David Winter].ch8": "Use buttons from 1 to 9 to insert. O starts."
 }

@@ -81,27 +81,64 @@ canvas {
 	display: flex;
 	flex-direction: column;
 	align-items: center;
+
 	overflow: hidden;
 	flex: 1;
-
-	margin-left: -106px;
 }
 
 #roms-wrapper * {
 	font-size: 13px;
 }
 
+#roms-content {
+	flex: 1;
+	width: 800px;
+	/* To align with the canvas */
+	margin-right: 212px;
+
+	display: flex;
+	overflow: hidden;
+	flex-direction: column;
+}
+
+#roms-select {
+	display: flex;
+	flex-direction: row;
+	align-items: center;
+}
+
 #roms {
-	margin: 10px 0;
-	width: 600px;
+	width: 100%;
+	height: 22px;
+}
+
+#reload {
+	margin-left: 10px;
+	height: 22px;
+	line-height: 22px;
+
+	padding: 0 5px;
+	flex-shrink: 0;
+
+	border: 1px solid rgba(0, 0, 0, 0.5);
+	background: white;
+	border-radius: 2px;
+	outline: none;
+}
+
+#reload:hover {
+	border-color: rgba(0, 0, 0, 1);
+}
+
+#reload:active {
+	opacity: 0.5;
 }
 
 #instructions {
 	padding: 10px;
-	border: 1px solid rgba(0, 0, 0, 0.1);
-	margin-bottom: 10px;
+	border: 1px solid rgba(0, 0, 0, 0.3);
+	margin: 10px 0;
 	overflow: auto;
-	width: 600px;
 	font-size: 13px;
 
 	white-space: pre-wrap;
@@ -113,15 +150,37 @@ canvas {
 	margin-bottom: 10px;
 }
 
-@media only screen and (max-width: 768px) {
+@media only screen and (max-width: 1024px) {
+	body {
+		height: auto;
+		min-height: 100%;
+	}
+
+	canvas, #roms-content {
+		width: 100%;
+	}
+
+	#roms-wrapper {
+		margin-left: 0;
+		padding: 10px;
+		overflow-y: auto;
+	}
+
+	#roms-content {
+		margin-right: 0;
+		width: 100%;
+		overflow-y: auto;
+	}
+}
+
+@media only screen and (max-width: 1024px) and (orientation: portrait) {
+	#keyboard {
+		margin-top: 10px;
+	}
+
 	#emulator-wrapper {
 		flex-direction: column;
 		padding-bottom: 0;
-	}
-
-	canvas {
-		width: 100%;
-		margin-bottom: 10px;
 	}
 
 	.row:last-child .button {
@@ -144,18 +203,8 @@ canvas {
 		margin-bottom: 0px !important;
 	}
 
-	#roms-wrapper {
-		margin-left: 0;
-		padding: 10px;
-		padding-top: 0;
-	}
-
 	#roms-wrapper * {
 		font-size: 11px;
-	}
-
-	#roms, #instructions {
-		width: 100%;
 	}
 
 	#instructions {

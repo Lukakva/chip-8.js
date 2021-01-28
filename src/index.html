@@ -37,12 +37,19 @@
 		</div>
 	</div>
 	<div id="roms-wrapper">
-		<select id="roms">
-			<option disabled selected>-- Select a ROM --</option>
-		</select>
-		<div id="instructions">Select a ROM above, and instructions will appear here</div>
-		<div id="link">
-			<a target="_blank" href="https://github.com/Lukakva/chip-8.js">https://github.com/Lukakva/chip-8.js</a>
+		<div id="roms-content">
+			<div id="roms-select">
+				<select id="roms">
+					<option disabled selected>-- Select a ROM --</option>
+				</select>
+				<button id="reload" style="display: none;">
+					Reload
+				</button>
+			</div>
+			<div id="instructions">Select a ROM above, and instructions will appear here</div>
+			<div id="link">
+				<a target="_blank" href="https://github.com/Lukakva/chip-8.js">https://github.com/Lukakva/chip-8.js</a>
+			</div>
 		</div>
 	</div>
 </body>

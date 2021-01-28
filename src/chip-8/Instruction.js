@@ -1,9 +1,6 @@
 /*
 	All instructions are listed in the order of this table
 	https://en.wikipedia.org/wiki/CHIP-8#Opcode_table
-
-	Although some of the functions should be next to each other
-	(like callSubroutine, returnFromSubroutine)
 */
 
 import { hex } from './Shared'
@@ -309,7 +306,7 @@ export default class Instruction {
 		Opcode: ANNN
 		Sets I to the address NNN.
 	*/
-	setMemoryRegister(NNN) {
+	setI(NNN) {
 		this.chip.registerI = NNN
 		this.chip.pc += 2
 	}
@@ -459,7 +456,7 @@ export default class Instruction {
 		Opcode: FX1E
 		Adds VX to I. VF is not affected.
 	*/
-	addMem(X) {
+	addToI(X) {
 		const { chip } = this
 
 		chip.registerI += chip.registers[X]
@@ -474,7 +471,7 @@ export default class Instruction {
 		Sets I to the location of the sprite for the character in VX.
 		Characters 0-F (in hexadecimal) are represented by a 4x5 font.
 	*/
-	setCharacterInMemory(X) {
+	loadCharacterSprite(X) {
 		const { chip } = this
 
 		// Since all characters are a 5 byte sprite
@@ -515,7 +512,7 @@ export default class Instruction {
 		but I itself is left unmodified.
 		(Meaning the I register is not modified)
 	*/
-	dumpRegisters(X) {
+	storeRegisters(X) {
 		const { chip } = this
 
 		for (let i = 0; i <= X; i++) {
@@ -544,8 +541,12 @@ export default class Instruction {
 
 	/*
 		Decodes an instruction
-		Returns an array that provides the argument names for the instruction
-		(Also useful for decompiling binaries)
+		Returns an array with the name and the arguments of the method to call
+
+		It would be more optimal to just call the function like so:
+		case 0xE0: return this.clear()
+		But by returning strings, the Decompiler can use this same class to
+		Disassemble ROMs into more readable code
 	*/
 	decode() {
 		const code = this.code
@@ -591,7 +592,7 @@ export default class Instruction {
 			}
 
 			case 0x9000: return ['skipIfRegistersNotEqual', 'X', 'Y']
-			case 0xA000: return ['setMemoryRegister', 'NNN']
+			case 0xA000: return ['setI', 'NNN']
 			case 0xB000: return ['jumpV0', 'NNN']
 			case 0xC000: return ['rand', 'X', 'NN']
 			case 0xD000: return ['draw', 'X', 'Y', 'N']
@@ -610,10 +611,10 @@ export default class Instruction {
 					case 0x0A: return ['awaitKeyPress',        'X']
 					case 0x15: return ['setDelayTimer',        'X']
 					case 0x18: return ['setSoundTimer',        'X']
-					case 0x1E: return ['addMem',               'X']
-					case 0x29: return ['setCharacterInMemory', 'X']
+					case 0x1E: return ['addToI',               'X']
+					case 0x29: return ['loadCharacterSprite',  'X']
 					case 0x33: return ['storeBCD',             'X']
-					case 0x55: return ['dumpRegisters',        'X']
+					case 0x55: return ['storeRegisters',       'X']
 					case 0x65: return ['loadRegisters',        'X']
 				}
 			}

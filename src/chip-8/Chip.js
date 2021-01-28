@@ -68,6 +68,9 @@ class Chip8 {
 			clear(this.keyboard)
 
 			this.screen.clear()
+			this.stopBeeping()
+
+			clearTimeout(this.nextCycle)
 		} else {
 			this.memory = new Uint8Array(RAM_SIZE)
 
@@ -266,7 +269,7 @@ class Chip8 {
 			this.stopBeeping()
 		}
 
-		setTimeout(() => {
+		this.nextCycle = setTimeout(() => {
 			this.cycle()
 		}, 1000 / TIMER_SPEED)
 	}
@@ -291,6 +294,8 @@ class Chip8 {
 		this.paused = true
 		this.stopBeeping()
 		this.screen.renderPaused()
+
+		clearTimeout(this.nextCycle)
 	}
 }
 
