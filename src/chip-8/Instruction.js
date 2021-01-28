@@ -262,7 +262,7 @@ export default class Instruction {
 	subtractRegisters(X, Y) {
 		const { chip, chip: {registers} } = this
 
-		// Store the least significant bit
+		// Store the !borrow in VF
 		registers[0xF] = registers[Y] >= registers[X]
 		registers[X] = registers[Y] - registers[X]
 
