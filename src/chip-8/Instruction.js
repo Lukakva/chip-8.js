@@ -599,7 +599,7 @@ export default class Instruction {
 
 			case 0xE000: {
 				switch (code & 0x00FF) {
-					case 0x9E: return ['skipIfKeyPressed', 'X']
+					case 0x9E: return ['skipIfKeyPressed',    'X']
 					case 0xA1: return ['skipIfKeyNotPressed', 'X']
 				}
 			}
@@ -625,7 +625,7 @@ export default class Instruction {
 		)
 	}
 
-	/* Prepares an executable version of the instruction*/
+	/* Prepares an executable version of the instruction */
 	executable() {
 		const decoded = this.decode()
 		const method = decoded[0]
